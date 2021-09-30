@@ -1,0 +1,2560 @@
+---
+title: "CSNQ Descriptive Analysis"
+author: "Nicole"
+date: "10/23/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(gridExtra)
+library(car)
+library(gganimate)
+```
+
+## Data and set-up
+
+```{r import data}
+### I include data from the following studies: ISEpilot, OG infant (Attention, Scaff, BigThings), PT, and RacePref
+alldata_total <- read.csv("MASTER Social Network Data_egodataframe_2.2.21.csv")
+alldata <- subset(alldata_total, groupnodefordaycareteachers.kids != "yes")
+# transform NetworkSize
+alldata$Network.Size_T <- sqrt(alldata$Network.Size+.5)
+# transform other count variables 
+alldata$NumContexts_T <- sqrt(alldata$NumContexts + .5)
+alldata$NumHighIntense_T <- sqrt(alldata$NumHighIntense+ .5)
+alldata$NumLowIntense_T <- sqrt(alldata$NumLowIntense + .5)
+
+### Subset by race 
+white <- subset(alldata, ChildRace == "European or White-American")
+black <- subset(alldata, ChildRace == "African or African-American")
+asian <- subset(alldata, ChildRace == "Asian or Asian-American")
+hispanic <- subset(alldata, ChildRace == "Hispanic or Latino-American")
+biracial <- subset(alldata, ChildRace == "Mixed/Biracial")
+other <- subset(alldata, ChildRace == "Other:"|
+                  ChildRace == "Middle Eastern")
+racialmin <- subset(alldata, ChildRace != "European or White-American")
+
+### Subset by language 
+mono <- subset(alldata, childspeakers == "monolingual")
+multilingual <- subset(alldata, childspeakers == "multilingual")
+
+### Check ages for subsets 
+# white
+min(white$ageinmonths, na.rm = TRUE)
+max(white$ageinmonths, na.rm = TRUE)
+mean(white$ageinmonths, na.rm = TRUE)
+sd(white$ageinmonths, na.rm = TRUE)
+# racial min
+min(racialmin$ageinmonths, na.rm = TRUE)
+max(racialmin$ageinmonths, na.rm = TRUE)
+mean(racialmin$ageinmonths, na.rm = TRUE)
+sd(racialmin$ageinmonths, na.rm = TRUE)
+# test difference in age 
+t.test(white$ageinmonths, racialmin$ageinmonths)
+age_race_ttest <- wilcox.test(white$ageinmonths, racialmin$ageinmonths)
+age_race_ttest 
+# mono
+min(mono$ageinmonths, na.rm = TRUE)
+max(mono$ageinmonths, na.rm = TRUE)
+mean(mono$ageinmonths, na.rm = TRUE)
+sd(mono$ageinmonths, na.rm = TRUE)
+# multi
+min(multilingual$ageinmonths, na.rm = TRUE)
+max(multilingual$ageinmonths, na.rm = TRUE)
+mean(multilingual$ageinmonths, na.rm = TRUE)
+sd(multilingual$ageinmonths, na.rm = TRUE)
+# test difference in age 
+t.test(mono$ageinmonths, multilingual$ageinmonths)
+age_lang_ttest <- wilcox.test(mono$ageinmonths, multilingual$ageinmonths)
+age_lang_ttest
+
+### Get counts of Race/Lang subset for 2x2 table 
+white_mono <- subset(white, childspeakers == "monolingual")
+white_multi <- subset(white, childspeakers == "multilingual")
+racialmin_mono <- subset(racialmin, childspeakers == "monolingual")
+racialmin_multi <- subset(racialmin, childspeakers == "multilingual")
+```
+
+## Descritptive Stats
+
+```{r descriptive stats}
+str(alldata)
+# total subjects
+length(alldata$SubjectID)
+# age of subjects
+min(alldata$ageinmonths, na.rm = TRUE)
+max(alldata$ageinmonths, na.rm = TRUE)
+mean(alldata$ageinmonths, na.rm = TRUE)
+sd(alldata$ageinmonths, na.rm = TRUE)
+# histogram of age 
+plot_histograms(alldata$ageinmonths, "")
+
+### breakdown by place tested
+unique(alldata$placetested)
+# lab stats
+min(alldata$ageinmonths[alldata$placetested == "lab"])
+max(alldata$ageinmonths[alldata$placetested == "lab"])
+mean(alldata$ageinmonths[alldata$placetested == "lab"])
+sd(alldata$ageinmonths[alldata$placetested == "lab"])
+# museum stats 
+min(alldata$ageinmonths[alldata$placetested == "museum"])
+max(alldata$ageinmonths[alldata$placetested == "museum"])
+mean(alldata$ageinmonths[alldata$placetested == "museum"])
+sd(alldata$ageinmonths[alldata$placetested == "museum"])
+
+### Racial Demographics of sample 
+levels(alldata$ChildRace)
+length(alldata$SubjectID[alldata$ChildRace == "European or White-American"])/length(alldata$SubjectID)
+length(alldata$SubjectID[alldata$ChildRace == "African or African-American"])/length(alldata$SubjectID)
+length(alldata$SubjectID[alldata$ChildRace == "Asian or Asian-American"])/length(alldata$SubjectID)
+length(alldata$SubjectID[alldata$ChildRace == "Middle Eastern"])/length(alldata$SubjectID)
+length(alldata$SubjectID[alldata$ChildRace == "Hispanic or Latino-American"])/length(alldata$SubjectID)
+length(alldata$SubjectID[alldata$ChildRace == "Mixed/Biracial"])/length(alldata$SubjectID)
+length(alldata$SubjectID[alldata$ChildRace == "Other:"])/length(alldata$SubjectID)
+
+### Maternal Edu 
+levels(alldata$MothersEdu)
+unique(alldata$MothersEdu)
+length(alldata$SubjectID[alldata$MothersEdu =="Bachelor"])
+length(alldata$SubjectID[alldata$MothersEdu == "Post-Graduate"])
+# try tidyverse
+medu <- alldata %>%
+  count(MothersEdu)
+
+### from Chicagoland 
+chicagoland <- alldata %>%
+  count(county)
+chicago <- alldata %>%
+  count(city)
+
+### Neighborhood Demos 
+min(alldata$median_income, na.rm = TRUE)
+max(alldata$median_income, na.rm = TRUE)
+mean(alldata$median_income, na.rm = TRUE)
+median(alldata$median_income, na.rm = TRUE)
+# urban
+urban.suburban <- alldata %>%
+  count("suburban.urban")
+```
+
+## Histograms 
+
+Size, race entropy, raceEI, LangEntropy, LangEI, prop adult, prop kin, prop intense
+
+```{r function for histogram plots}
+
+plot_histograms <- function(x, xaxis) {
+  ggplot(alldata, aes(x)) +
+  geom_histogram() +
+    xlab(xaxis) + 
+  theme_minimal() +
+  theme(
+  axis.line = element_line(colour = "black"),
+  text = element_text(size = 18, family = "Georgia")
+  )
+}
+
+plot_subset_histograms_ <- function(data, x, title, xaxis) {
+  ggplot(data, aes(x)) +
+  geom_histogram() +
+    ggtitle(title) + 
+    xlab(xaxis) + 
+  theme_minimal() +
+  theme(
+  axis.line = element_line(colour = "black"),
+  text = element_text(size = 18, family = "Georgia")
+  )
+}
+
+
+```
+
+### Network Size 
+
+```{r network size histogram}
+plot_histograms(alldata$Network.Size, "Network Size")
+min(alldata$Network.Size)
+max(alldata$Network.Size)
+mean(alldata$Network.Size)
+sd(alldata$Network.Size)
+
+### BY RACIAL MAJORITY VS MINORITY
+## White
+plot_subset_histograms_(white, white$Network.Size, 
+                        "White subjects", "Network Size")
+# descriptive stats 
+min(white$Network.Size, na.rm = TRUE)
+max(white$Network.Size, na.rm = TRUE)
+mean(white$Network.Size, na.rm = TRUE)
+sd(white$Network.Size, na.rm = TRUE)
+## Racial Minoirty 
+plot_subset_histograms_(racialmin, racialmin$Network.Size, 
+                        "Racial Minority Subjects", "Network Size")
+# descriptive stats 
+min(racialmin$Network.Size, na.rm = TRUE)
+max(racialmin$Network.Size, na.rm = TRUE)
+mean(racialmin$Network.Size, na.rm = TRUE)
+sd(racialmin$Network.Size, na.rm = TRUE)
+# test difference 
+t.test(white$Network.Size_T, racialmin$Network.Size_T)
+size_race_ttest <- wilcox.test(white$Network.Size_T, racialmin$Network.Size_T)
+size_race_ttest
+
+### BY LINGUISTICT MAJORITY VS MINORITY
+# monolingual 
+plot_subset_histograms_(mono, mono$Network.Size, 
+                        "English Speakers", "Network Size")
+# descriptive stats 
+min(mono$Network.Size, na.rm = TRUE)
+max(mono$Network.Size, na.rm = TRUE)
+mean(mono$Network.Size, na.rm = TRUE)
+sd(mono$Network.Size, na.rm = TRUE)
+# multilingual 
+plot_subset_histograms_(multilingual, multilingual$Network.Size, 
+                        "Multilingual Speakers", "Network Size")
+# descriptive stats 
+min(multilingual$Network.Size, na.rm = TRUE)
+max(multilingual$Network.Size, na.rm = TRUE)
+mean(multilingual$Network.Size, na.rm = TRUE)
+sd(multilingual$Network.Size, na.rm = TRUE)
+# test difference 
+t.test(mono$Network.Size_T, multilingual$Network.Size_T)
+size_lang_ttest <- wilcox.test(mono$Network.Size_T, multilingual$Network.Size_T)
+size_lang_ttest
+```
+
+### Raw # of low and high intensity 
+
+```{r number intensity relationshp histogram}
+# Number of High Intense Relationships
+numhighintense <- plot_histograms(alldata$NumHighIntense, "") +
+  xlim(0,15.1) + ylim(0,45) + 
+  ggtitle("Number of High Intense \nRelationships")
+# Number of Low Intense Relationships
+numlowintense <- plot_histograms(alldata$NumLowIntense, "") +
+  xlim(0,15.1) + ylim(0,45) + 
+  ggtitle("Number of Low Intense \nRelationships")
+### Number of High Intense
+min(alldata$NumHighIntense, na.rm = TRUE)
+max(alldata$NumHighIntense, na.rm = TRUE)
+mean(alldata$NumHighIntense, na.rm = TRUE)
+sd(alldata$NumHighIntense, na.rm = TRUE)
+### Number of Low Intense
+min(alldata$NumLowIntense, na.rm = TRUE)
+max(alldata$NumLowIntense, na.rm = TRUE)
+mean(alldata$NumLowIntense, na.rm = TRUE)
+sd(alldata$NumLowIntense, na.rm = TRUE)
+
+### Number of High Intense
+# white
+min(white$NumHighIntense, na.rm = TRUE)
+max(white$NumHighIntense, na.rm = TRUE)
+mean(white$NumHighIntense, na.rm = TRUE)
+sd(white$NumHighIntense, na.rm = TRUE)
+# racialmin
+min(racialmin$NumHighIntense, na.rm = TRUE)
+max(racialmin$NumHighIntense, na.rm = TRUE)
+mean(racialmin$NumHighIntense, na.rm = TRUE)
+sd(racialmin$NumHighIntense, na.rm = TRUE)
+# test difference 
+t.test(white$NumHighIntense_T, racialmin$NumHighIntense_T)
+numhighint_race_ttest <- wilcox.test(white$NumHighIntense_T, racialmin$NumHighIntense_T)
+numhighint_race_ttest
+
+# mono
+min(mono$NumHighIntense, na.rm = TRUE)
+max(mono$NumHighIntense, na.rm = TRUE)
+mean(mono$NumHighIntense, na.rm = TRUE)
+sd(mono$NumHighIntense, na.rm = TRUE)
+# multi
+min(multilingual$NumHighIntense, na.rm = TRUE)
+max(multilingual$NumHighIntense, na.rm = TRUE)
+mean(multilingual$NumHighIntense, na.rm = TRUE)
+sd(multilingual$NumHighIntense, na.rm = TRUE)
+# test difference 
+t.test(mono$NumHighIntense_T, multilingual$NumHighIntense_T)
+numhighint_lang_ttest <- wilcox.test(mono$NumHighIntense_T, multilingual$NumHighIntense_T)
+numhighint_lang_ttest
+
+
+### Number of Low Intense
+# white
+min(white$NumLowIntense, na.rm = TRUE)
+max(white$NumLowIntense, na.rm = TRUE)
+mean(white$NumLowIntense, na.rm = TRUE)
+sd(white$NumLowIntense, na.rm = TRUE)
+# racialmin
+min(racialmin$NumLowIntense, na.rm = TRUE)
+max(racialmin$NumLowIntense, na.rm = TRUE)
+mean(racialmin$NumLowIntense, na.rm = TRUE)
+sd(racialmin$NumLowIntense, na.rm = TRUE)
+# test difference 
+t.test(white$NumLowIntense, racialmin$NumLowIntense)
+wilcox.test(white$NumLowIntense, racialmin$NumLowIntense)
+
+# mono
+min(mono$NumLowIntense, na.rm = TRUE)
+max(mono$NumLowIntense, na.rm = TRUE)
+mean(mono$NumLowIntense, na.rm = TRUE)
+sd(mono$NumLowIntense, na.rm = TRUE)
+# multi
+min(multilingual$NumLowIntense, na.rm = TRUE)
+max(multilingual$NumLowIntense, na.rm = TRUE)
+mean(multilingual$NumLowIntense, na.rm = TRUE)
+sd(multilingual$NumLowIntense, na.rm = TRUE)
+# test difference 
+t.test(mono$NumLowIntense, multilingual$NumLowIntense)
+wilcox.test(mono$NumLowIntense, multilingual$NumLowIntense)
+
+### Combine graphs 
+grid.arrange(numhighintense, numlowintense, ncol = 2)
+```
+
+### Proportion of intense relationships
+
+```{r prop intensentiy relationships histograms}
+# prop High Intense Relationships
+prophighintense <- plot_histograms(alldata$PropHighIntense, "") +
+  ggtitle("Proportion of High Intense \nRelationships") + xlim(-0.05, 1.01)
+# prop Low Intense Relationships
+proplowintense <- plot_histograms(alldata$PropLowIntense, "") +
+  ggtitle("Proportion of Low Intense \nRelationships") + xlim(-0.05, 1.01)
+### Prop HIGH Intense Relationships
+mean(alldata$PropHighIntense, na.rm = TRUE)
+sd(alldata$PropHighIntense, na.rm = TRUE)
+min(alldata$PropHighIntense, na.rm = TRUE)
+max(alldata$PropHighIntense, na.rm = TRUE)
+
+### Prop HIGH Intense Relationships
+# white
+mean(white$PropHighIntense, na.rm = TRUE)
+sd(white$PropHighIntense, na.rm = TRUE)
+# racialmin
+mean(racialmin$PropHighIntense, na.rm = TRUE)
+sd(racialmin$PropHighIntense, na.rm = TRUE)
+# test difference 
+t.test(white$PropHighIntense, racialmin$PropHighIntense)
+prophigh_race_ttest <- wilcox.test(white$PropHighIntense, racialmin$PropHighIntense)
+prophigh_race_ttest
+# mono
+mean(mono$PropHighIntense, na.rm = TRUE)
+sd(mono$PropHighIntense, na.rm = TRUE)
+# multi
+mean(multilingual$PropHighIntense, na.rm = TRUE)
+sd(multilingual$PropHighIntense, na.rm = TRUE)
+# test difference 
+t.test(mono$PropHighIntense, multilingual$PropHighIntense)
+prophigh_lang_ttest <- wilcox.test(mono$PropHighIntense, multilingual$PropHighIntense)
+prophigh_lang_ttest
+
+### Prop LOW Intense Relationships
+# white
+mean(white$PropLowIntense, na.rm = TRUE)
+sd(white$PropLowIntense, na.rm = TRUE)
+# racialmin
+mean(racialmin$PropLowIntense, na.rm = TRUE)
+sd(racialmin$PropLowIntense, na.rm = TRUE)
+# test difference 
+t.test(white$PropLowIntense, racialmin$PropLowIntense)
+wilcox.test(white$PropLowIntense, racialmin$PropLowIntense)
+# mono
+mean(mono$PropLowIntense, na.rm = TRUE)
+sd(mono$PropLowIntense, na.rm = TRUE)
+# multi
+mean(multilingual$PropLowIntense, na.rm = TRUE)
+sd(multilingual$PropLowIntense, na.rm = TRUE)
+# test difference 
+t.test(mono$PropLowIntense, multilingual$PropLowIntense)
+wilcox.test(mono$PropLowIntense, multilingual$PropLowIntense)
+
+grid.arrange(prophighintense, proplowintense, ncol = 2)
+
+```
+
+### Proportion Kin
+
+```{r propkin histogram}
+plot_histograms(alldata$PropKin, "Proportion of Kin Relationships")
+# white
+mean(alldata$PropKin, na.rm = TRUE)
+sd(alldata$PropKin, na.rm = TRUE)
+min(alldata$PropKin, na.rm = TRUE)
+max(alldata$PropKin, na.rm = TRUE)
+
+### Subsets
+# white
+mean(white$PropKin, na.rm = TRUE)
+sd(white$PropKin, na.rm = TRUE)
+plot_subset_histograms_(white, white$PropKin, 
+                        "White Subjects", "Proportion Kin")
+# racialmin
+mean(racialmin$PropKin, na.rm = TRUE)
+sd(racialmin$PropKin, na.rm = TRUE)
+plot_subset_histograms_(racialmin, racialmin$PropKin, 
+                        "Racial Minority Subjects", "Proportion Kin")
+# test difference 
+t.test(white$PropKin, racialmin$PropKin)
+propkin_race_ttest <- wilcox.test(white$PropKin, racialmin$PropKin)
+propkin_race_ttest
+
+# mono
+mean(mono$PropKin, na.rm = TRUE)
+sd(mono$PropKin, na.rm = TRUE)
+# multi
+mean(multilingual$PropKin, na.rm = TRUE)
+sd(multilingual$PropKin, na.rm = TRUE)
+# test difference 
+t.test(mono$PropKin, multilingual$PropKin)
+propkin_lang_ttest <- wilcox.test(mono$PropKin, multilingual$PropKin)
+propkin_lang_ttest
+```
+
+### Proportion Adult
+
+```{r propadult histogram}
+plot_histograms(alldata$PropAdult, "Proportion of Adult Relationships")
+
+mean(alldata$PropAdult, na.rm = TRUE)
+sd(alldata$PropAdult, na.rm = TRUE)
+min(alldata$PropAdult, na.rm = TRUE)
+max(alldata$PropAdult, na.rm = TRUE)
+
+### Subsets
+# white
+mean(white$PropAdult, na.rm = TRUE)
+sd(white$PropAdult, na.rm = TRUE)
+# racialmin
+mean(racialmin$PropAdult, na.rm = TRUE)
+sd(racialmin$PropAdult, na.rm = TRUE)
+# test difference 
+t.test(white$PropAdult, racialmin$PropAdult)
+propadult_race_ttest <- wilcox.test(white$PropAdult, racialmin$PropAdult)
+propadult_race_ttest
+# mono
+mean(mono$PropAdult, na.rm = TRUE)
+sd(mono$PropAdult, na.rm = TRUE)
+# multi
+mean(multilingual$PropAdult, na.rm = TRUE)
+sd(multilingual$PropAdult, na.rm = TRUE)
+# test difference 
+t.test(mono$PropAdult, multilingual$PropAdult)
+propadult_lang_ttest <- wilcox.test(mono$PropAdult, multilingual$PropAdult)
+propadult_lang_ttest
+```
+
+### RaceEntropy
+
+```{r raceentropy histogram}
+plot_histograms(alldata$NetworkRaceEntropy, "")
+
+# white
+white_entropy <- ggplot(white, aes(NetworkRaceEntropy)) +
+  geom_histogram() + ggtitle("White") + 
+  xlab("Racial Entropy") +
+  xlim(-0.1,2.5) + 
+  theme_minimal() +
+  theme(axis.line = element_line(colour = "black"),
+  text = element_text(size = 16, family = "Georgia"))
+# black
+black_entropy <- ggplot(black, aes(NetworkRaceEntropy)) +
+  geom_histogram() + ggtitle("Black") + 
+  xlim(-0.1,2.5) +
+  xlab("Racial Entropy") +
+  theme_minimal() +
+  theme(axis.line = element_line(colour = "black"),
+  text = element_text(size = 16, family = "Georgia"))
+# asian
+asian_entropy <- ggplot(asian, aes(NetworkRaceEntropy)) +
+  geom_histogram() + ggtitle("Asian") + 
+  xlim(-0.1,2.5) +
+  xlab("Racial Entropy") +
+  theme_minimal() +
+  theme(axis.line = element_line(colour = "black"),
+  text = element_text(size = 16, family = "Georgia"))
+# hispanic 
+hispanic_entropy <- ggplot(hispanic, aes(NetworkRaceEntropy)) +
+  geom_histogram() + ggtitle("Hispanic") + 
+  xlim(-0.1,2.5) +
+  xlab("Racial Entropy") +
+  theme_minimal() +
+  theme(axis.line = element_line(colour = "black"),
+  text = element_text(size = 16, family = "Georgia"))
+# biracial 
+biracial_entropy <- ggplot(biracial, aes(NetworkRaceEntropy)) +
+  geom_histogram() + ggtitle("Biracial") + 
+  xlim(-0.1,2.5) +
+  xlab("Racial Entropy") +
+  theme_minimal() +
+  theme(axis.line = element_line(colour = "black"),
+  text = element_text(size = 16, family = "Georgia"))
+
+grid.arrange(white_entropy, black_entropy, asian_entropy, hispanic_entropy, biracial_entropy)
+
+### Run ANOVA to see if RaceEntropy is different by child race
+raceentro_aov <- aov(NetworkRaceEntropy ~ ChildRace, 
+                     data = alldata)
+summary(raceentro_aov)
+ggplot(alldata, aes(ChildRace, NetworkRaceEntropy)) +
+  geom_boxplot()
+
+
+### Descriptive Stats
+
+min(alldata$NetworkRaceEntropy, na.rm = TRUE)
+max(alldata$NetworkRaceEntropy, na.rm = TRUE)
+mean(alldata$NetworkRaceEntropy, na.rm = TRUE)
+sd(alldata$NetworkRaceEntropy, na.rm = TRUE)
+
+# white
+min(white$NetworkRaceEntropy, na.rm = TRUE)
+max(white$NetworkRaceEntropy, na.rm = TRUE)
+mean(white$NetworkRaceEntropy, na.rm = TRUE)
+sd(white$NetworkRaceEntropy, na.rm = TRUE)
+# black
+min(black$NetworkRaceEntropy, na.rm = TRUE)
+max(black$NetworkRaceEntropy, na.rm = TRUE)
+mean(black$NetworkRaceEntropy, na.rm = TRUE)
+sd(black$NetworkRaceEntropy, na.rm = TRUE)
+# asian
+min(asian$NetworkRaceEntropy, na.rm = TRUE)
+max(asian$NetworkRaceEntropy, na.rm = TRUE)
+mean(asian$NetworkRaceEntropy, na.rm = TRUE)
+sd(asian$NetworkRaceEntropy, na.rm = TRUE)
+# hispanic
+min(hispanic$NetworkRaceEntropy, na.rm = TRUE)
+max(hispanic$NetworkRaceEntropy, na.rm = TRUE)
+mean(hispanic$NetworkRaceEntropy, na.rm = TRUE)
+sd(hispanic$NetworkRaceEntropy, na.rm = TRUE)
+# biracial
+min(biracial$NetworkRaceEntropy, na.rm = TRUE)
+max(biracial$NetworkRaceEntropy, na.rm = TRUE)
+mean(biracial$NetworkRaceEntropy, na.rm = TRUE)
+sd(biracial$NetworkRaceEntropy, na.rm = TRUE)
+# other
+min(other$NetworkRaceEntropy, na.rm = TRUE)
+max(other$NetworkRaceEntropy, na.rm = TRUE)
+mean(other$NetworkRaceEntropy, na.rm = TRUE)
+sd(other$NetworkRaceEntropy, na.rm = TRUE)
+
+### Subsets
+# white
+mean(white$NetworkRaceEntropy, na.rm = TRUE)
+sd(white$NetworkRaceEntropy, na.rm = TRUE)
+# racialmin
+mean(racialmin$NetworkRaceEntropy, na.rm = TRUE)
+sd(racialmin$NetworkRaceEntropy, na.rm = TRUE)
+# test difference 
+t.test(white$NetworkRaceEntropy, racialmin$NetworkRaceEntropy)
+raceentro_ttest <- wilcox.test(white$NetworkRaceEntropy, racialmin$NetworkRaceEntropy)
+raceentro_ttest
+# mono
+mean(mono$NetworkRaceEntropy, na.rm = TRUE)
+sd(mono$NetworkRaceEntropy, na.rm = TRUE)
+# multi
+mean(multilingual$NetworkRaceEntropy, na.rm = TRUE)
+sd(multilingual$NetworkRaceEntropy, na.rm = TRUE)
+# test difference 
+t.test(mono$NetworkRaceEntropy, multilingual$NetworkRaceEntropy)
+wilcox.test(mono$NetworkRaceEntropy, multilingual$NetworkRaceEntropy) 
+```
+
+### Race EI Index
+
+```{r raceEIIndex histogram}
+plot_histograms(alldata$RaceEIindex, "Racial EI Index")
+```
+
+### Race EI Index - detailed biracial
+
+```{r raceEIIndex histogram}
+plot_histograms(alldata$RaceEIindex_detailedbiracial, "") + xlim(-1.1,1.1)
+
+ggplot(alldata, aes(RaceEIindex_detailedbiracial, colour = ChildRace)) +
+  geom_histogram() +
+  xlab("Racial EI Index") +
+  theme_minimal() +
+  theme(axis.line = element_line(colour = "black"),
+  text = element_text(size = 16, family = "Georgia"))
+
+# white
+white_ei <- ggplot(white, aes(RaceEIindex_detailedbiracial)) +
+  geom_histogram() + ggtitle("White") + 
+  xlab("Racial EI Index") +
+  xlim(-1.2, 1.2) + 
+  theme_minimal() +
+  theme(axis.line = element_line(colour = "black"),
+  text = element_text(size = 16, family = "Georgia"))
+# black
+black_ei <- ggplot(black, aes(RaceEIindex_detailedbiracial)) +
+  geom_histogram() + ggtitle("Black") + 
+  xlab("Racial EI Index") +
+  xlim(-1.2, 1.2) + 
+  theme_minimal() +
+  theme(axis.line = element_line(colour = "black"),
+  text = element_text(size = 16, family = "Georgia"))
+# asian
+asian_ei <- ggplot(asian, aes(RaceEIindex_detailedbiracial)) +
+  geom_histogram() + ggtitle("Asian") + 
+  xlab("Racial EI Index") +
+  xlim(-1.2, 1.2) + 
+  theme_minimal() +
+  theme(axis.line = element_line(colour = "black"),
+  text = element_text(size = 16, family = "Georgia"))
+# hispanic 
+hispanic_ei <- ggplot(hispanic, aes(RaceEIindex_detailedbiracial)) +
+  geom_histogram() + ggtitle("Hispanic") + 
+  xlab("Racial EI Index") +
+  xlim(-1.2, 1.2) + 
+  theme_minimal() +
+  theme(axis.line = element_line(colour = "black"),
+  text = element_text(size = 16, family = "Georgia"))
+# biracial 
+biracial_ei <- ggplot(biracial, aes(RaceEIindex_detailedbiracial)) +
+  geom_histogram() + ggtitle("Biracial") + 
+  xlab("Racial EI Index") +
+  xlim(-1.2, 1.2) + 
+  theme_minimal() +
+  theme(axis.line = element_line(colour = "black"),
+  text = element_text(size = 16, family = "Georgia"))
+
+grid.arrange(white_ei, black_ei, asian_ei, hispanic_ei, biracial_ei)
+
+### Descriptive Stats
+
+min(alldata$RaceEIindex_detailedbiracial, na.rm = TRUE)
+max(alldata$RaceEIindex_detailedbiracial, na.rm = TRUE)
+mean(alldata$RaceEIindex_detailedbiracial, na.rm = TRUE)
+sd(alldata$RaceEIindex_detailedbiracial, na.rm = TRUE)
+
+# white
+min(white$RaceEIindex_detailedbiracial, na.rm = TRUE)
+max(white$RaceEIindex_detailedbiracial, na.rm = TRUE)
+mean(white$RaceEIindex_detailedbiracial, na.rm = TRUE)
+sd(white$RaceEIindex_detailedbiracial, na.rm = TRUE)
+# black
+min(black$RaceEIindex_detailedbiracial, na.rm = TRUE)
+max(black$RaceEIindex_detailedbiracial, na.rm = TRUE)
+mean(black$RaceEIindex_detailedbiracial, na.rm = TRUE)
+sd(black$RaceEIindex_detailedbiracial, na.rm = TRUE)
+# asian
+min(asian$RaceEIindex_detailedbiracial, na.rm = TRUE)
+max(asian$RaceEIindex_detailedbiracial, na.rm = TRUE)
+mean(asian$RaceEIindex_detailedbiracial, na.rm = TRUE)
+sd(asian$RaceEIindex_detailedbiracial, na.rm = TRUE)
+# hispanic
+min(hispanic$RaceEIindex_detailedbiracial, na.rm = TRUE)
+max(hispanic$RaceEIindex_detailedbiracial, na.rm = TRUE)
+mean(hispanic$RaceEIindex_detailedbiracial, na.rm = TRUE)
+sd(hispanic$RaceEIindex_detailedbiracial, na.rm = TRUE)
+# biracial
+min(biracial$RaceEIindex_detailedbiracial, na.rm = TRUE)
+max(biracial$RaceEIindex_detailedbiracial, na.rm = TRUE)
+mean(biracial$RaceEIindex_detailedbiracial, na.rm = TRUE)
+sd(biracial$RaceEIindex_detailedbiracial, na.rm = TRUE)
+# other
+min(other$RaceEIindex_detailedbiracial, na.rm = TRUE)
+max(other$RaceEIindex_detailedbiracial, na.rm = TRUE)
+mean(other$RaceEIindex_detailedbiracial, na.rm = TRUE)
+sd(other$RaceEIindex_detailedbiracial, na.rm = TRUE)
+
+### Subsets
+# white
+mean(white$RaceEIindex_detailedbiracial, na.rm = TRUE)
+sd(white$RaceEIindex_detailedbiracial, na.rm = TRUE)
+# racialmin
+mean(racialmin$RaceEIindex_detailedbiracial, na.rm = TRUE)
+sd(racialmin$RaceEIindex_detailedbiracial, na.rm = TRUE)
+# test difference 
+t.test(white$RaceEIindex_detailedbiracial, racialmin$RaceEIindex_detailedbiracial)
+raceei_ttest <- wilcox.test(white$RaceEIindex_detailedbiracial, racialmin$RaceEIindex_detailedbiracial)
+raceei_ttest
+# mono
+mean(mono$RaceEIindex_detailedbiracial, na.rm = TRUE)
+sd(mono$RaceEIindex_detailedbiracial, na.rm = TRUE)
+# multi
+mean(multilingual$RaceEIindex_detailedbiracial, na.rm = TRUE)
+sd(multilingual$RaceEIindex_detailedbiracial, na.rm = TRUE)
+# test difference 
+t.test(mono$RaceEIindex_detailedbiracial, multilingual$RaceEIindex_detailedbiracial)
+wilcox.test(mono$RaceEIindex_detailedbiracial, multilingual$RaceEIindex_detailedbiracial)
+```
+
+### LanguageEntropy - per lang
+
+```{r langentropy per lang histogram}
+plot_histograms(alldata$LangEntropy_perlang, "Network Language Diversity - entorpy")
+```
+
+### LanguageEntropy - per category
+
+```{r languageentropy per category}
+plot_histograms(alldata$LangEntropy_percategory, "Network Language Diversity - entorpy")
+
+mean(alldata$LangEntropy_percategory, na.rm = TRUE)
+sd(alldata$LangEntropy_percategory, na.rm = TRUE)
+min(alldata$LangEntropy_percategory, na.rm = TRUE)
+max(alldata$LangEntropy_percategory, na.rm = TRUE)
+
+mono_langentro <- ggplot(mono, aes(LangEntropy_percategory)) +
+  geom_histogram() + ggtitle("Monolingual English Speakers") + 
+  xlab("Network Linguistic Entropy") +
+  theme_minimal() +
+  theme(axis.line = element_line(colour = "black"),
+  text = element_text(size = 16, family = "Georgia"))
+
+multi_langentro <- ggplot(multilingual, aes(LangEntropy_percategory)) +
+  geom_histogram() + ggtitle("Multilingual Speakers") + 
+  xlab("Network Linguistic Entropy") +
+  #xlim(-1.2, 1.2) + 
+  theme_minimal() +
+  theme(axis.line = element_line(colour = "black"),
+  text = element_text(size = 16, family = "Georgia"))
+
+
+### Subsets
+# white
+mean(white$LangEntropy_percategory, na.rm = TRUE)
+sd(white$LangEntropy_percategory, na.rm = TRUE)
+# racialmin
+mean(racialmin$LangEntropy_percategory, na.rm = TRUE)
+sd(racialmin$LangEntropy_percategory, na.rm = TRUE)
+# test difference 
+t.test(white$LangEntropy_percategory, racialmin$LangEntropy_percategory)
+wilcox.test(white$LangEntropy_percategory, racialmin$LangEntropy_percategory)
+# mono
+mean(mono$LangEntropy_percategory, na.rm = TRUE)
+sd(mono$LangEntropy_percategory, na.rm = TRUE)
+# multi
+mean(multilingual$LangEntropy_percategory, na.rm = TRUE)
+sd(multilingual$LangEntropy_percategory, na.rm = TRUE)
+# test difference 
+t.test(mono$LangEntropy_percategory, multilingual$LangEntropy_percategory)
+langentro_ttest <- wilcox.test(mono$LangEntropy_percategory, multilingual$LangEntropy_percategory)
+langentro_ttest
+
+grid.arrange(mono_langentro, multi_langentro, ncol = 2)
+```
+
+### Language EI Index 
+
+```{r lang eiindex histogram}
+plot_histograms(alldata$LangEIIndex, "Network Language Diversity - EI Index") +
+  xlim(-1.1, 1.1)
+
+mean(alldata$LangEIIndex, na.rm = TRUE)
+sd(alldata$LangEIIndex, na.rm = TRUE)
+min(alldata$LangEIIndex, na.rm = TRUE)
+max(alldata$LangEIIndex, na.rm = TRUE)
+
+mono_eilang <- ggplot(mono, aes(LangEIIndex)) +
+  geom_histogram() + ggtitle("Monolingual English Speakers") + 
+  xlab("Network Linguistic EI Index") +
+  xlim(-1.1, 1.1) + 
+  theme_minimal() +
+  theme(axis.line = element_line(colour = "black"),
+  text = element_text(size = 16, family = "Georgia"))
+
+multi_eilang <- ggplot(multilingual, aes(LangEIIndex)) +
+  geom_histogram() + ggtitle("Multilingual Speakers") + 
+  xlab("Network Linguistic EI Index") +
+  xlim(-1.1, 1.1) + 
+  theme_minimal() +
+  theme(axis.line = element_line(colour = "black"),
+  text = element_text(size = 16, family = "Georgia"))
+
+### Subsets
+# white
+mean(white$LangEIIndex, na.rm = TRUE)
+sd(white$LangEIIndex, na.rm = TRUE)
+# racialmin
+mean(racialmin$LangEIIndex, na.rm = TRUE)
+sd(racialmin$LangEIIndex, na.rm = TRUE)
+# test difference 
+t.test(white$LangEIIndex, racialmin$LangEIIndex)
+wilcox.test(white$LangEIIndex, racialmin$LangEIIndex)
+# mono
+mean(mono$LangEIIndex, na.rm = TRUE)
+sd(mono$LangEIIndex, na.rm = TRUE)
+# multi
+mean(multilingual$LangEIIndex, na.rm = TRUE)
+sd(multilingual$LangEIIndex, na.rm = TRUE)
+# test difference 
+t.test(mono$LangEIIndex, multilingual$LangEIIndex)
+langei_ttest <- wilcox.test(mono$LangEIIndex, multilingual$LangEIIndex)
+langei_ttest
+
+grid.arrange(mono_eilang, multi_eilang, ncol = 2)
+
+
+```
+
+### Number of Components 
+
+```{r number of components}
+plot_histograms(alldata$NumContexts, "Number of Components")
+
+### Descriptives on the Number of Contexts 
+min(alldata$NumContexts, na.rm = TRUE)
+max(alldata$NumContexts, na.rm = TRUE)
+mean(alldata$NumContexts, na.rm = TRUE)
+sd(alldata$NumContexts, na.rm = TRUE)
+
+## Sanity check that it is negatively correlated with density 
+ggplot(alldata, aes(NumContexts, Density)) +
+  geom_point() 
+
+
+### Subsets
+# white
+mean(white$NumContexts, na.rm = TRUE)
+sd(white$NumContexts, na.rm = TRUE)
+# racialmin
+mean(racialmin$NumContexts, na.rm = TRUE)
+sd(racialmin$NumContexts, na.rm = TRUE)
+# test difference 
+t.test(white$NumContexts_T, racialmin$NumContexts_T)
+numcomp_race_ttest <- wilcox.test(white$NumContexts_T, racialmin$NumContexts_T)
+numcomp_race_ttest
+# mono
+mean(mono$NumContexts, na.rm = TRUE)
+sd(mono$NumContexts, na.rm = TRUE)
+# multi
+mean(multilingual$NumContexts, na.rm = TRUE)
+sd(multilingual$NumContexts, na.rm = TRUE)
+# test difference 
+t.test(mono$NumContexts, multilingual$NumContexts)
+numcomp_lang_ttest <- wilcox.test(mono$NumContexts, multilingual$NumContexts)
+numcomp_lang_ttest
+```
+
+
+### Component Ratio
+
+```{r component ratio histogram}
+plot_histograms(alldata$componentratio, "Component Ratio")
+
+mean(alldata$componentratio, na.rm = TRUE)
+sd(alldata$componentratio, na.rm = TRUE)
+min(alldata$componentratio, na.rm = TRUE)
+max(alldata$componentratio, na.rm = TRUE)
+
+## Sanity check that it is negatively correlated with component ratio
+ggplot(alldata, aes(componentratio, Density)) +
+  geom_point()
+# test correlation
+cor.test(alldata$componentratio, alldata$Density)
+
+### Subsets
+# white
+mean(white$componentratio, na.rm = TRUE)
+sd(white$componentratio, na.rm = TRUE)
+# racialmin
+mean(racialmin$componentratio, na.rm = TRUE)
+sd(racialmin$componentratio, na.rm = TRUE)
+# test difference 
+t.test(white$componentratio, racialmin$componentratio)
+cr_race_ttest <- wilcox.test(white$componentratio, racialmin$componentratio)
+cr_race_ttest
+# mono
+mean(mono$componentratio, na.rm = TRUE)
+sd(mono$componentratio, na.rm = TRUE)
+# multi
+mean(multilingual$componentratio, na.rm = TRUE)
+sd(multilingual$componentratio, na.rm = TRUE)
+# test difference 
+t.test(mono$componentratio, multilingual$componentratio)
+cr_lang_ttest <- wilcox.test(mono$componentratio, multilingual$componentratio)
+cr_lang_ttest
+```
+
+### Density
+
+```{r density histogram}
+plot_histograms(alldata$Density, "Density")
+
+mean(alldata$Density, na.rm = TRUE)
+sd(alldata$Density, na.rm = TRUE)
+min(alldata$Density, na.rm = TRUE)
+max(alldata$Density, na.rm = TRUE)
+
+### Subsets
+# white
+mean(white$Density, na.rm = TRUE)
+sd(white$Density, na.rm = TRUE)
+# racialmin
+mean(racialmin$Density, na.rm = TRUE)
+sd(racialmin$Density, na.rm = TRUE)
+# test difference 
+t.test(white$Density, racialmin$Density)
+density_race_ttest <- wilcox.test(white$Density, racialmin$Density)
+density_race_ttest
+# mono
+mean(mono$Density, na.rm = TRUE)
+sd(mono$Density, na.rm = TRUE)
+# multi
+mean(multilingual$Density, na.rm = TRUE)
+sd(multilingual$Density, na.rm = TRUE)
+# test difference 
+t.test(mono$Density, multilingual$Density)
+density_lang_ttest <- wilcox.test(mono$Density, multilingual$Density)
+density_lang_ttest
+```
+
+### Neighborhood RD
+
+```{r neighborhood rd}
+plot_histograms(alldata$NeighorRaceDiv, "Neighborhood Racial Diversity")
+
+ggplot(alldata, aes(NeighorRaceDiv)) +
+  geom_histogram(aes(fill = suburban.urban))
+
+```
+
+### Neighborhood LD
+
+```{r neighborhood ld}
+plot_histograms(alldata$NeighborLangDiv, "Neighborhood Linguistic Diversity")
+
+ggplot(alldata, aes(NeighborLangDiv)) +
+  geom_histogram(aes(fill = suburban.urban))
+
+```
+
+***
+## Network Variables and Size
+
+Network Size, High and Low Intense Relationships, Proportion of Kin, Proportion of Adult Relationships, Density, Num Components, CR, Racial Entropy, Racial EI Index, Language Entropy, Language EI Index, 
+
+```{r function for scatterplots plots}
+plot_scatter <- function(x, y, xaxis, yaxis) {
+  ggplot(alldata, aes(x, y)) +
+  geom_point() +
+  xlab(xaxis) + 
+  ylab(yaxis) +
+  theme_minimal() +
+  theme(
+  axis.line = element_line(colour = "black"),
+  text = element_text(size = 18, family = "Georgia")
+  )
+}
+```
+
+### Network Size and High/Low Intense Relationships 
+
+```{r size and highlow int relationships}
+### NUMBER OF HIGH INTENSE RELATIONSHIPS
+plot_scatter(alldata$Network.Size, alldata$NumHighIntense, 
+             "Network Size", "# High Intense") +
+  geom_smooth(method = "lm")
+# test correltion
+cor.test(alldata$Network.Size_T, alldata$NumHighIntense_T)
+### NUMBER OF LOW INTENSE RELATIONSHIPS
+plot_scatter(alldata$Network.Size, alldata$NumLowIntense, 
+             "Network Size", "# Low Intense") +
+  geom_smooth(method = "lm")
+# test correltion
+cor.test(alldata$Network.Size_T, alldata$NumLowIntense_T)
+
+### PROP OF HIGH INTENSE RELATIONSHIPS
+plot_scatter(alldata$Network.Size, alldata$PropHighIntense, 
+             "Network Size", "Prop High Intense") +
+  geom_smooth(method = "lm")
+# test correlation
+size_prophigh <- cor.test(alldata$Network.Size_T, alldata$PropHighIntense,
+         method = "spearman")
+size_prophigh 
+# run regression with age and size
+prophighint_model <- lm(PropHighIntense ~ Network.Size_T*ageinmonths, 
+                        data = alldata)
+summary(prophighint_model)
+
+### PROP OF LOW INTENSE RELATIONSHIPS
+plot_scatter(alldata$Network.Size, alldata$PropLowIntense, 
+             "Network Size", "Prop Low Intense") +
+  geom_smooth(method = "lm")
+# test correlation
+cor.test(alldata$Network.Size_T, alldata$PropLowIntense,
+         method = "spearman")
+# run regression with age and size
+proplowint_model <- lm(PropLowIntense ~ Network.Size_T*ageinmonths, 
+                        data = alldata)
+summary(proplowint_model)
+```
+
+### Network Size and Proportion of Kin
+
+```{r size and prop kin}
+plot_scatter(alldata$Network.Size, alldata$PropKin,
+             "Network Size", "Proportion of Kin") +
+  geom_smooth(method = "lm")
+# test correlation
+size_propkin <- cor.test(alldata$Network.Size_T, alldata$PropKin,
+         method = "spearman")
+size_propkin
+# run regression with age and size
+propkin_model <- lm(PropKin ~ Network.Size_T*ageinmonths, 
+                        data = alldata)
+summary(propkin_model)
+```
+
+### Network Size and Proportion of Adult
+
+```{r size and prop adult}
+plot_scatter(alldata$Network.Size, alldata$PropAdult, 
+             "Network Size", "Proportion of Adult") +
+  geom_smooth(method = "lm")
+# test correlation
+size_propadult <- cor.test(alldata$Network.Size_T, alldata$PropAdult,
+         method = "spearman")
+size_propadult
+# run regression with age and size
+propadult_model <- lm(PropAdult ~ Network.Size_T*ageinmonths, 
+                        data = alldata)
+summary(propadult_model)
+```
+
+### Network Size and Density
+
+```{r size and density}
+plot_scatter(alldata$Network.Size, alldata$Density,
+             "Network Size", "Density") +
+  geom_smooth(method = "lm")
+# test correlation
+size_density <- cor.test(alldata$Network.Size_T, alldata$Density,
+         method = "spearman")
+size_density
+# run regression with age and size
+density_model <- lm(Density ~ Network.Size_T*ageinmonths, 
+                        data = alldata)
+summary(density_model)
+```
+
+### Network Size and Number of Components 
+
+```{r size and num components}
+plot_scatter(alldata$Network.Size, alldata$NumContexts, 
+             "Network Size", "Number of Components") +
+  geom_smooth(method = "lm")
+# test correlation
+size_numcomp <- cor.test(alldata$Network.Size_T, alldata$NumContexts_T,
+         method = "spearman")
+size_numcomp 
+# run regression with age and size
+numcomponents_model <- lm(NumContexts_T ~ Network.Size_T*ageinmonths, 
+                        data = alldata)
+summary(numcomponents_model)
+```
+
+### Network Size and Component Ratio 
+
+```{r size and cr}
+plot_scatter(alldata$Network.Size, alldata$componentratio, 
+             "Network Size", "Component Ratio")
+# test correlation
+size_cr <- cor.test(alldata$Network.Size_T, alldata$componentratio,
+         method = "spearman")
+size_cr
+# run regression with age and size
+cr_model <- lm(componentratio ~ Network.Size_T*ageinmonths, 
+                        data = alldata)
+summary(cr_model)
+```
+
+### Network Size and Racial Diversity 
+
+```{r size and racial diversity}
+### Racial Entropy
+plot_scatter(alldata$Network.Size, alldata$NetworkRaceEntropy, 
+             "Network Size", "Racial Entropy") +
+  geom_smooth(method = "lm")
+# test correlation
+size_raceentro <- cor.test(alldata$Network.Size_T, alldata$NetworkRaceEntropy,
+         method = "spearman")
+size_raceentro 
+# run regression with age and size
+raceentro_model <- lm(NetworkRaceEntropy ~ Network.Size_T*ageinmonths, 
+                        data = alldata)
+summary(raceentro_model)
+
+### Racial EI Index
+plot_scatter(alldata$Network.Size, alldata$RaceEIindex_detailedbiracial, 
+             "Network Size", "Racial EI Index") +
+  geom_smooth(method = "lm")
+# test correlation
+size_raceei <- cor.test(alldata$Network.Size_T, alldata$RaceEIindex_detailedbiracial,
+         method = "spearman")
+size_raceei
+# run regression with age and size
+raceei_model <- lm(RaceEIindex_detailedbiracial ~ Network.Size_T*ageinmonths, 
+                        data = alldata)
+summary(raceei_model)
+```
+
+### Network Size and Language Diversity 
+
+```{r size and language diversity}
+### Language Entropy
+plot_scatter(alldata$Network.Size, alldata$LangEntropy_percategory,
+             "Network Size", "Language Entorpy")
+# test correlation
+size_langentro <- cor.test(alldata$Network.Size_T, alldata$LangEntropy_percategory,
+         method = "spearman")
+size_langentro
+# run regression with age and size
+langentro_model <- lm(LangEntropy_percategory ~ Network.Size_T*ageinmonths, 
+                        data = alldata)
+summary(langentro_model)
+
+### Language EI Index 
+plot_scatter(alldata$Network.Size, alldata$LangEIIndex,
+             "Network Size", "Language EI Index")
+# test correlation
+size_langei <- cor.test(alldata$Network.Size_T, alldata$LangEIIndex,
+         method = "spearman")
+size_langei
+# run regression with age and size
+langei_model <- lm(LangEIIndex ~ Network.Size_T*ageinmonths, 
+                        data = alldata)
+summary(langei_model)
+```
+
+### Correct for multiple comparisons Network Size and other variables
+
+```{r correct for multiple compariosns}
+pvals <- c(size_age_cor$p.value, size_prophigh$p.value, size_propkin$p.value,
+           size_propadult$p.value, size_density$p.value, size_numcomp$p.value,
+           size_cr$p.value, size_raceentro$p.value, size_raceei$p.value, 
+           size_langentro$p.value, size_langei$p.value)
+# adjust for multiple comparisons
+round(p.adjust(pvals, method = "fdr", n = length(pvals)),2)
+
+
+```
+
+
+
+***
+
+## Network Variables and Age 
+
+### Network Size and Age 
+
+```{r networksize and age}
+size_age <- plot_scatter(alldata$ageinyears, alldata$Network.Size, 
+             "Age (in years)", "Network Size")
+size_age + geom_smooth(method = "lm")
+# test correlation
+size_age_cor <- cor.test(alldata$ageinmonths, alldata$Network.Size_T)
+size_age_cor 
+# use spearman test 
+cor.test(alldata$ageinmonths, alldata$Network.Size_T,
+         method = "spearman")
+
+
+# trying gganimate
+animateplot <- size_age + transition_time(ageinyears) +
+  shadow_mark() + scale_x_continuous(limits = c(0,5))
+
+#animate(animateplot)
+```
+
+### Number/Prop of High/Low Relationships with Age
+
+```{r number high/low relationships with age}
+#### RAW NUMBER
+# Number of High Intense 
+highint_age <- plot_scatter(alldata$ageinyears, alldata$NumHighIntense,
+                            "Age (in years)", "# High Intense Relationships")
+highint_age + geom_smooth(method = "lm")
+# test correlation
+highint_age_cor <- cor.test(alldata$ageinmonths, alldata$NumHighIntense,
+         method = "spearman")
+highint_age_cor
+
+# Number of Low Intense 
+lowint_age <- plot_scatter(alldata$ageinyears, alldata$NumLowIntense,
+                            "Age (in years)", "# Low Intense Relationships")
+lowint_age + geom_smooth(method = "lm")
+# test correlation
+lowint_age_cor <- cor.test(alldata$ageinmonths, alldata$NumLowIntense, 
+         method = "spearman")
+lowint_age_cor
+
+#### PROPORTION 
+# Proportion of High Intense 
+prophigint_age <- plot_scatter(alldata$ageinyears, alldata$PropHighIntense,
+                            "Age (in years)", "Prop. High Intense Relationships")
+prophigint_age <- prophigint_age + ylim(0,1) + xlim(0,3.5)
+# test correlation
+prophigint_age_cor <- cor.test(alldata$ageinmonths, alldata$PropHighIntense, 
+         method = "spearman")
+prophigint_age_cor
+
+# Proportion of Low Intense 
+proplowint_age <- plot_scatter(alldata$ageinyears, alldata$PropLowIntense,
+                            "Age (in years)", "Prop. Low Intense Relationships")
+proplowint_age <- proplowint_age + ylim(0,1) + xlim(0,3.5)
+# test correlation
+proplowint_age_cor <- cor.test(alldata$ageinmonths, alldata$PropLowIntense, 
+         method = "spearman")
+proplowint_age_cor
+# combine 
+grid.arrange(prophigint_age, proplowint_age, ncol = 2)
+
+
+
+####### CHECK RAW NUMBER HIGH AND LOW WITH SIZE ##########
+plot_scatter(alldata$Network.Size, alldata$NumLowIntense,
+                            "Size", "Raw Low Intense Relationships") + geom_smooth(method = "lm")
+cor.test(alldata$Network.Size_T, alldata$NumLowIntense,
+         method = "spearman")
+
+####### CHECK PROP HIGH AND PROP KIN ##########
+plot_scatter(alldata$PropKin, alldata$PropHighIntense, 
+             "Proportion Kin", "Prop High Intense") + geom_smooth(method = "lm")
+cor.test(alldata$PropKin, alldata$PropHighIntense,
+         method = "spearman")
+
+
+
+```
+
+
+### Proportion Kin and Age 
+
+```{r propkin and age}
+propkin_age <- plot_scatter(alldata$ageinyears, alldata$PropKin, 
+             "Age (in years)", "Proportion Kin")
+propkin_age + geom_smooth(method = "lm")
+
+# transform propkin - doesn't help 
+alldata$PropKin_T <- asin(sqrt(alldata$PropKin))
+plot_histograms(alldata$PropKin_T, "")
+
+# test correlation
+propkin_age_cor <- cor.test(alldata$ageinmonths, alldata$PropKin, 
+         method = "spearman")
+propkin_age_cor
+
+# see if correlation holds for 3yr and younger 
+cor.test(alldata$ageinmonths[alldata$ageinyears<3.4], alldata$PropKin[alldata$ageinyears<3.4], 
+         method = "spearman")
+
+```
+
+### Proportion Adult and Age
+
+```{r propadult and age}
+propadult_age <- plot_scatter(alldata$ageinyears, alldata$PropAdult, 
+             "Age (in years)", "Proportion Adults")
+propadult_age + geom_smooth(method = "lm")
+
+# test correlation
+propadult_age_cor <- cor.test(alldata$ageinmonths, alldata$PropAdult, 
+         method = "spearman")
+propadult_age_cor
+```
+
+### Network Racial Entropy and Racial EI Index 
+
+```{r networkdiversitymeasures}
+plot_scatter(alldata$NetworkRaceEntropy, alldata$RaceEIindex_detailedbiracial,
+             "Network Racial Entropy", "Racial EI Index") + 
+  geom_smooth(method = "lm")
+# test corrleation
+raceentro_raceei_cor <- cor.test(alldata$NetworkRaceEntropy, alldata$RaceEIindex_detailedbiracial, 
+         method = "spearman")
+raceentro_raceei_cor 
+```
+
+### Network Racial Entropy and Age
+
+```{r racentropy and age}
+raceentropy_age <- plot_scatter(alldata$ageinyears, alldata$NetworkRaceEntropy, 
+             "Age (in years)", "Network Racial Entropy")
+raceentropy_age <- raceentropy_age + geom_smooth(method = "lm")
+raceentropy_age
+# test correlation
+raceentropy_age_cor <- cor.test(alldata$ageinmonths, alldata$NetworkRaceEntropy, 
+         method = "spearman")
+raceentropy_age_cor
+```
+
+### Racial EI Index and Age
+
+```{r raceeiindex and age}
+raceei_age <- plot_scatter(alldata$ageinyears, alldata$RaceEIindex_detailedbiracial, 
+             "Age (in years)", "Racial EI Index") + geom_smooth(method = "lm")
+raceei_age 
+
+# test correlation
+raceei_age_cor <- cor.test(alldata$ageinmonths, alldata$RaceEIindex_detailedbiracial, 
+         method = "spearman")
+raceei_age_cor
+
+## combine racediv and age 
+grid.arrange(raceentropy_age, raceei_age, ncol = 2)
+```
+
+### Network Language Entropy and Linguistic EI Index 
+
+```{r langentroy and langei}
+plot_scatter(alldata$LangEntropy_percategory, alldata$LangEIIndex,
+             "Network Language Entropy", "Linguistic EI Index") + 
+  geom_smooth(method = "lm")
+# test correlation
+langentro_langei_cor <- cor.test(alldata$LangEntropy_percategory, alldata$LangEIIndex,
+         method = "spearman")
+langentro_langei_cor 
+```
+
+### Network Language Entropy and Age
+
+```{r langentropy and age}
+langentropy_age <- plot_scatter(alldata$ageinyears, alldata$LangEntropy_percategory, 
+             "Age (in years)", "Network Language Entropy")
+langentropy_age
+
+# test correlation
+langentropy_age_cor <- cor.test(alldata$ageinmonths, alldata$LangEntropy_percategory, 
+         method = "spearman")
+langentropy_age_cor
+```
+
+### Network Linguistic EI Index and Age
+
+```{r linguistic diversity and age }
+langei_age <- plot_scatter(alldata$ageinyears, alldata$LangEIIndex, 
+             "Age (in years)", "Network Linguistic EI Index")
+langei_age
+
+ggplot(alldata, aes(ageinyears, LangEIIndex, colour = childspeakers)) +
+  geom_point() +
+  xlab("Age (in years)") + 
+  ylab("Linguistic EI Index") +
+  theme_minimal() +
+  theme(axis.line = element_line(colour = "black"),
+  text = element_text(size = 18, family = "Georgia"))
+
+
+# test correlation
+langei_age_cor <- cor.test(alldata$ageinmonths, alldata$LangEIIndex,
+         method = "spearman")
+langei_age_cor
+
+## combine graphs 
+grid.arrange(langentropy_age, langei_age, ncol = 2)
+```
+
+### Number of Components and Age
+
+```{r number components}
+numcomp <- plot_scatter(alldata$ageinyears, alldata$NumContexts,
+             "Age (in years)", "Number of Components") + geom_smooth(method = "lm")
+numcomp
+
+### test correalaiton
+# transform Number of Comonents 
+alldata$NumContexts_T <- sqrt(alldata$NumContexts + .5)
+components_age_cor <- cor.test(alldata$ageinmonths, alldata$NumContexts_T,
+                               method = "spearman")
+components_age_cor
+
+### Number of Components and Size?
+plot_scatter(alldata$Network.Size, alldata$NumContexts,
+             "Network Size", "Number of Contexts") + geom_smooth(method = "lm")
+components_size_cor <- cor.test(alldata$Network.Size_T, alldata$NumContexts_T,
+                               method = "spearman")
+components_size_cor
+
+```
+
+
+### Component Ratio and Age
+
+```{r component ratio and age}
+cr <- plot_scatter(alldata$ageinyears, alldata$componentratio, 
+             "Age (in years)", "Component Ratio")
+cr
+# test correlation
+cr_age_cor <- cor.test(alldata$ageinmonths, alldata$componentratio,
+         method = "spearman")
+cr_age_cor
+
+# Component Ratio and Size 
+plot_scatter(alldata$Network.Size, alldata$componentratio, 
+             "Size", "Component Ratio")
+
+grid.arrange(numcomp, cr, ncol = 2)
+```
+
+
+### Density and Age
+
+```{r density and age}
+# subset with just density data 
+densitydata <- subset(alldata, placetested == "museum")
+
+ggplot(densitydata, aes(ageinyears, Density)) +
+  geom_point() +
+  xlab("Age (in years)") +
+  ylab("Density") +
+  theme_minimal() +
+  theme(axis.line = element_line(colour = "black"),
+  text = element_text(size = 18, family = "Georgia")) 
+
+# test correlation
+density_age_cor <- cor.test(alldata$ageinmonths, alldata$Density, 
+         method = "spearman")
+density_age_cor
+```
+
+
+### Network Race and Network Language 
+
+```{r network race and netework language}
+### Entropy
+plot_scatter(alldata$NetworkRaceEntropy, alldata$LangEntropy_perlang,
+             "Network Racial Entropy", "Network Language Entropy") +
+  geom_smooth(method = "lm")
+# test correlation
+cor.test(alldata$NetworkRaceEntropy, alldata$LangEntropy_perlang,
+         method = "spearman")
+
+### EI Index
+plot_scatter(alldata$RaceEIindex_detailedbiracial, alldata$LangEIIndex,
+             "Network Racial EI", "Network Language EI") +
+  geom_smooth(method = "lm")
+# test correlation
+cor.test(alldata$RaceEIindex_detailedbiracial, alldata$LangEIIndex,
+         method = "spearman")
+```
+
+***
+
+## Network and Neigborhood Network 
+
+### Racial Diversity
+
+```{r network and neighborhood}
+### Racial Diversity 
+ggplot(alldata, aes(NeighorRaceDiv, NetworkRaceEntropy)) +
+  geom_point() +
+  xlab("Neighborhood Racial Entropy") + 
+  ylab("Network Racial Entropy") +
+  theme_minimal() +
+  geom_smooth(method = "lm") + 
+  theme(axis.line = element_line(colour = "black"),
+  text = element_text(size = 18, family = "Georgia"))
+
+## create a separate dataframe for urban/suburban to get rid of NA
+geolocate <- subset(alldata, suburban.urban == "urban"|
+                      suburban.urban == "suburban/rural")
+# plot
+ggplot(geolocate, aes(NeighorRaceDiv, NetworkRaceEntropy, colour = suburban.urban)) +
+  geom_point() +
+  xlab("Neighborhood Racial Entropy") + 
+  ylab("Network Racial Entropy") +
+  geom_smooth(method = "lm") + 
+  scale_color_manual(values = c("red", "blue")) + 
+  theme_minimal() + 
+  theme(axis.line = element_line(colour = "black"),
+  text = element_text(size = 18, family = "Georgia")) +
+  labs(colour = "")
+
+# test correlation
+neighborhood_rd_suburb <- cor.test(alldata$NeighorRaceDiv[alldata$suburban.urban == "suburban/rural"],
+         alldata$NetworkRaceEntropy[alldata$suburban.urban == "suburban/rural"],
+         method = "spearman")
+neighborhood_rd_suburb
+# test correlation
+neighborhood_rd_urban <- cor.test(alldata$NeighorRaceDiv[alldata$suburban.urban == "urban"],
+         alldata$NetworkRaceEntropy[alldata$suburban.urban == "urban"],
+         method = "spearman")
+neighborhood_rd_urban
+# test correlation
+neighborhood_rd <- cor.test(alldata$NeighorRaceDiv, alldata$NetworkRaceEntropy,
+         method = "spearman")
+neighborhood_rd
+
+### subset by urban and nonurban 
+urban <- subset(alldata, suburban.urban == "urban")
+nonurban <- subset(alldata, suburban.urban == "suburban/rural")
+# urban 
+ggplot(urban, aes(NeighorRaceDiv, NetworkRaceEntropy)) +
+  geom_point() +
+  ggtitle("Urban") + 
+  xlab("Neighborhood Racial Entropy") + 
+  ylab("Network Racial Entropy") +
+  theme_minimal() +
+  geom_smooth(method = "lm") + 
+  theme(axis.line = element_line(colour = "black"),
+  text = element_text(size = 18, family = "Georgia"))
+# test correlation
+cor.test(urban$NeighorRaceDiv, urban$NetworkRaceEntropy,
+         method = "spearman")
+# nonurban
+ggplot(nonurban, aes(NeighorRaceDiv, NetworkRaceEntropy)) +
+  geom_point() +
+  ggtitle("NonUrban") + 
+  xlab("Neighborhood Racial Entropy") + 
+  ylab("Network Racial Entropy") +
+  theme_minimal() +
+  theme(axis.line = element_line(colour = "black"),
+  text = element_text(size = 18, family = "Georgia"))
+# test correlation
+cor.test(nonurban$NeighorRaceDiv, nonurban$NetworkRaceEntropy,
+         method = "spearman")
+
+# combine 
+grid.arrange(networkrd_urban, networkrd_nonurban, ncol = 2)
+```
+
+### Language Diversity
+
+```{r network and neighborhood langdiv}
+### Linguistic Diversity 
+ggplot(alldata, aes(NeighborLangDiv, LangEntropy_perlang)) +
+  geom_point() +
+  xlab("Neighborhood Language Entropy") + 
+  ylab("Network Language Entropy") +
+  theme_minimal() +
+  geom_smooth(method = "lm") + 
+  theme(axis.line = element_line(colour = "black"),
+  text = element_text(size = 18, family = "Georgia"))
+## test correlation
+cor.test(alldata$NeighborLangDiv, alldata$LangEntropy_perlang,
+         method = "spearman")
+
+#### By geographic location 
+ggplot(geolocate, aes(NeighborLangDiv, LangEntropy_perlang, colour = suburban.urban)) +
+  geom_point() +
+  xlab("Neighborhood Language Entropy") + 
+  ylab("Network Language Entropy") +
+  theme_minimal() + ylim(0,2.5) +
+  geom_smooth(method = "lm") + 
+  scale_color_manual(values = c("red", "blue")) + 
+  theme(axis.line = element_line(colour = "black"),
+  text = element_text(size = 18, family = "Georgia")) +
+  labs(colour = "")
+### test correlation
+neighborhood_ld_urban <- cor.test(alldata$NeighborLangDiv[alldata$suburban.urban == "urban"],
+         alldata$LangEntropy_perlang[alldata$suburban.urban == "urban"],
+         method = "spearman")
+neighborhood_ld_urban
+### test correlation
+neighborhood_ld_suburb <- cor.test(alldata$NeighborLangDiv[alldata$suburban.urban == "suburban/rural"],
+         alldata$LangEntropy_perlang[alldata$suburban.urban == "suburban/rural"],
+         method = "spearman")
+neighborhood_ld_suburb
+### test correlation
+neighborhood_ld <- cor.test(alldata$NeighborLangDiv, alldata$LangEntropy_perlang, 
+                            method = "spearman")
+neighborhood_ld
+```
+
+***
+
+## DAYCARE/SCHOOL ANALYSIS
+
+```{r daycare analysis descriptives}
+school <- subset(alldata, daycare.school == "yes")
+noschool <- subset(alldata, daycare.school == "no")
+# how many subjects?
+nrow(school)
+nrow(noschool)
+
+### ages for school and no school 
+# school 
+min(school$ageinmonths, na.rm = TRUE)
+max(school$ageinmonths, na.rm = TRUE)
+mean(school$ageinmonths, na.rm = TRUE)
+sd(school$ageinmonths, na.rm = TRUE)
+# histogram of age 
+school_age <- ggplot(school, aes(ageinmonths)) +
+  geom_histogram() + ggtitle("school") + ylim(0,25)
+school_age
+# noschool 
+min(noschool$ageinmonths, na.rm = TRUE)
+max(noschool$ageinmonths, na.rm = TRUE)
+mean(noschool$ageinmonths, na.rm = TRUE)
+sd(noschool$ageinmonths, na.rm = TRUE)
+# histogram of age 
+noschool_age <- ggplot(noschool, aes(ageinmonths)) +
+  geom_histogram() + ggtitle("no school") + ylim(0,25)
+noschool_age
+# combine graphs 
+grid.arrange(school_age, noschool_age, ncol = 2)
+
+### make a dataframe that gets rid of NAs for the boxplots 
+school_df <- subset(alldata, daycare.school == "yes"|
+                      daycare.school == "no")
+
+### test to see if kids in daycare are significantly older 
+t.test(school_df$ageinmonths[school_df$daycare.school == "yes"],
+       school_df$ageinmonths[school_df$daycare.school == "no"])
+
+```
+
+### Boxplot function
+
+```{r boxplot function}
+plot_boxplot <- function(yvariable, yaxis) {
+  ggplot(school_df, aes(daycare.school, yvariable)) +
+  geom_boxplot(fill = "grey") +
+  xlab("Daycare or School") + 
+  ylab(yaxis) + 
+  theme_minimal() +
+  theme(text = element_text(family = "Georgia", size = 16), 
+        axis.line = element_line(colour = "black"))
+}
+```
+
+### Daycare and Network Size 
+
+```{r daycare and network size}
+# make a bargraph
+plot_boxplot(school_df$Network.Size, "Network Size")
+
+# school stats 
+min(school$Network.Size, na.rm = TRUE)
+max(school$Network.Size, na.rm = TRUE)
+mean(school$Network.Size, na.rm = TRUE)
+sd(school$Network.Size, na.rm = TRUE)
+
+# noschool stats 
+min(noschool$Network.Size, na.rm = TRUE)
+max(noschool$Network.Size, na.rm = TRUE)
+mean(noschool$Network.Size, na.rm = TRUE)
+sd(noschool$Network.Size, na.rm = TRUE)
+
+### test difference 
+t.test(school_df$Network.Size_T[school_df$daycare.school == "yes"],
+       school_df$Network.Size_T[school_df$daycare.school == "no"])
+# test variability
+var.test(school_df$Network.Size_T[school_df$daycare.school == "yes"],
+         school_df$Network.Size_T[school_df$daycare.school == "no"])
+# nonparametric test 
+school_size_tt <- wilcox.test(school_df$Network.Size_T ~ school_df$daycare.school)
+school_size_tt
+```
+
+### Daycare and Prop High Intense Relationships
+
+```{r daycare and prop high intense}
+# make a bargraph
+plot_boxplot(school_df$PropHighIntense, "Prop. High Intense Relationships")
+
+# school stats 
+min(school$PropHighIntense, na.rm = TRUE)
+max(school$PropHighIntense, na.rm = TRUE)
+mean(school$PropHighIntense, na.rm = TRUE)
+sd(school$PropHighIntense, na.rm = TRUE)
+
+# noschool stats 
+min(noschool$PropHighIntense, na.rm = TRUE)
+max(noschool$PropHighIntense, na.rm = TRUE)
+mean(noschool$PropHighIntense, na.rm = TRUE)
+sd(noschool$PropHighIntense, na.rm = TRUE)
+
+### test difference 
+t.test(school_df$PropHighIntense[school_df$daycare.school == "yes"],
+       school_df$PropHighIntense[school_df$daycare.school == "no"])
+# nonparametric test 
+school_prophigh_tt <- wilcox.test(school_df$PropHighIntense ~ school_df$daycare.school)
+school_prophigh_tt
+```
+
+### Daycare and Kin and Adult 
+
+```{r daycare and kin and adult }
+##### KIN 
+# make a bargraph
+plot_boxplot(school_df$PropKin, "Prop. Kin Relationships")
+
+# school stats 
+min(school$PropKin, na.rm = TRUE)
+max(school$PropKin, na.rm = TRUE)
+mean(school$PropKin, na.rm = TRUE)
+sd(school$PropKin, na.rm = TRUE)
+
+# noschool stats 
+min(noschool$PropKin, na.rm = TRUE)
+max(noschool$PropKin, na.rm = TRUE)
+mean(noschool$PropKin, na.rm = TRUE)
+sd(noschool$PropKin, na.rm = TRUE)
+
+### test difference 
+t.test(school_df$PropKin[school_df$daycare.school == "yes"],
+       school_df$PropKin[school_df$daycare.school == "no"])
+# nonparametric test 
+school_kin_tt <- wilcox.test(school_df$PropKin ~ school_df$daycare.school)
+school_kin_tt
+
+##### ADULT
+# make a bargraph
+plot_boxplot(school_df$PropAdult, "Prop. Adult Relationships")
+
+# school stats 
+min(school$PropAdult, na.rm = TRUE)
+max(school$PropAdult, na.rm = TRUE)
+mean(school$PropAdult, na.rm = TRUE)
+sd(school$PropAdult, na.rm = TRUE)
+
+# noschool stats 
+min(noschool$PropAdult, na.rm = TRUE)
+max(noschool$PropAdult, na.rm = TRUE)
+mean(noschool$PropAdult, na.rm = TRUE)
+sd(noschool$PropAdult, na.rm = TRUE)
+
+### test difference 
+t.test(school_df$PropAdult[school_df$daycare.school == "yes"],
+       school_df$PropAdult[school_df$daycare.school == "no"])
+# nonparametric test 
+school_adult_tt <- wilcox.test(school_df$PropAdult ~ school_df$daycare.school)
+school_adult_tt
+```
+
+### Daycare and Racial Entropy and Racial EI
+
+```{r daycare and racial diversity }
+##### Racial ENTROPY
+# make a bargraph
+plot_boxplot(school_df$NetworkRaceEntropy, "Network Racial Entropy")
+
+# school stats 
+min(school$NetworkRaceEntropy, na.rm = TRUE)
+max(school$NetworkRaceEntropy, na.rm = TRUE)
+mean(school$NetworkRaceEntropy, na.rm = TRUE)
+sd(school$NetworkRaceEntropy, na.rm = TRUE)
+
+# noschool stats 
+min(noschool$NetworkRaceEntropy, na.rm = TRUE)
+max(noschool$NetworkRaceEntropy, na.rm = TRUE)
+mean(noschool$NetworkRaceEntropy, na.rm = TRUE)
+sd(noschool$NetworkRaceEntropy, na.rm = TRUE)
+
+### test difference 
+t.test(school_df$NetworkRaceEntropy[school_df$daycare.school == "yes"],
+       school_df$NetworkRaceEntropy[school_df$daycare.school == "no"])
+# nonparametric test 
+school_raceentro_tt <- wilcox.test(school_df$NetworkRaceEntropy ~ school_df$daycare.school)
+school_raceentro_tt
+
+##### Racial EI Index
+# make a bargraph
+plot_boxplot(school_df$RaceEIindex, "Racial EI Index")
+
+# school stats 
+min(school$RaceEIindex, na.rm = TRUE)
+max(school$RaceEIindex, na.rm = TRUE)
+mean(school$RaceEIindex, na.rm = TRUE)
+sd(school$RaceEIindex, na.rm = TRUE)
+
+# noschool stats 
+min(noschool$RaceEIindex, na.rm = TRUE)
+max(noschool$RaceEIindex, na.rm = TRUE)
+mean(noschool$RaceEIindex, na.rm = TRUE)
+sd(noschool$RaceEIindex, na.rm = TRUE)
+
+### test difference 
+t.test(school_df$RaceEIindex[school_df$daycare.school == "yes"],
+       school_df$RaceEIindex[school_df$daycare.school == "no"])
+# nonparametric test 
+school_raceei_tt <- wilcox.test(school_df$RaceEIindex ~ school_df$daycare.school)
+school_raceei_tt 
+```
+
+### Daycare and Language Entropy and Linguistic EI
+
+```{r daycare and language diversity }
+##### Language ENTROPY
+# make a bargraph
+plot_boxplot(school_df$LangEntropy_perlang, "Network Language Entropy")
+
+# school stats 
+min(school$LangEntropy_perlang, na.rm = TRUE)
+max(school$LangEntropy_perlang, na.rm = TRUE)
+mean(school$LangEntropy_perlang, na.rm = TRUE)
+sd(school$LangEntropy_perlang, na.rm = TRUE)
+
+# noschool stats 
+min(noschool$LangEntropy_perlang, na.rm = TRUE)
+max(noschool$LangEntropy_perlang, na.rm = TRUE)
+mean(noschool$LangEntropy_perlang, na.rm = TRUE)
+sd(noschool$LangEntropy_perlang, na.rm = TRUE)
+
+### test difference 
+t.test(school_df$LangEntropy_perlang[school_df$daycare.school == "yes"],
+       school_df$LangEntropy_perlang[school_df$daycare.school == "no"])
+# nonparametric test 
+school_langentro_tt <- wilcox.test(school_df$LangEntropy_perlang ~ school_df$daycare.school)
+school_langentro_tt
+
+##### Linguisitc EI Index
+# make a bargraph
+plot_boxplot(school_df$LangEIIndex, "Linguistic EI Index")
+
+# school stats 
+min(school$LangEIIndex, na.rm = TRUE)
+max(school$LangEIIndex, na.rm = TRUE)
+mean(school$LangEIIndex, na.rm = TRUE)
+sd(school$LangEIIndex, na.rm = TRUE)
+
+# noschool stats 
+min(noschool$LangEIIndex, na.rm = TRUE)
+max(noschool$LangEIIndex, na.rm = TRUE)
+mean(noschool$LangEIIndex, na.rm = TRUE)
+sd(noschool$LangEIIndex, na.rm = TRUE)
+
+### test difference 
+t.test(school_df$LangEIIndex[school_df$daycare.school == "yes"],
+       school_df$LangEIIndex[school_df$daycare.school == "no"])
+# nonparametric test 
+school_langei_tt <- wilcox.test(school_df$LangEIIndex ~ school_df$daycare.school)
+school_langei_tt 
+```
+
+### Daycare and Number of Components
+
+```{r daycare and number of components}
+### Number of Components 
+plot_boxplot(school_df$NumContexts, "Number of Components")
+
+### test difference 
+t.test(school_df$NumContexts_T[school_df$daycare.school == "yes"],
+       school_df$NumContexts_T[school_df$daycare.school == "no"])
+# nonparametric test 
+school_components_tt <- wilcox.test(school_df$NumContexts_T ~ school_df$daycare.school)
+school_components_tt
+```
+
+
+### Daycare and Component Ratio
+
+```{r daycare and component ratio}
+##### Component Ratio
+# make a bargraph
+plot_boxplot(school_df$componentratio, "Component Ratio")
+
+# school stats 
+min(school$componentratio, na.rm = TRUE)
+max(school$componentratio, na.rm = TRUE)
+mean(school$componentratio, na.rm = TRUE)
+sd(school$componentratio, na.rm = TRUE)
+
+# noschool stats 
+min(noschool$componentratio, na.rm = TRUE)
+max(noschool$componentratio, na.rm = TRUE)
+mean(noschool$componentratio, na.rm = TRUE)
+sd(noschool$componentratio, na.rm = TRUE)
+
+### test difference 
+t.test(school_df$componentratio[school_df$daycare.school == "yes"],
+       school_df$componentratio[school_df$daycare.school == "no"])
+# nonparametric test 
+school_cr_tt <- wilcox.test(school_df$componentratio ~ school_df$daycare.school)
+school_cr_tt
+```
+
+### Daycare and Density
+
+```{r daycare and density}
+##### Component Ratio
+# make a bargraph
+plot_boxplot(school_df$Density, "Density")
+
+# school stats 
+min(school$Density, na.rm = TRUE)
+max(school$Density, na.rm = TRUE)
+mean(school$Density, na.rm = TRUE)
+sd(school$Density, na.rm = TRUE)
+
+# noschool stats 
+min(noschool$Density, na.rm = TRUE)
+max(noschool$Density, na.rm = TRUE)
+mean(noschool$Density, na.rm = TRUE)
+sd(noschool$Density, na.rm = TRUE)
+
+### test difference 
+t.test(school_df$Density[school_df$daycare.school == "yes"],
+       school_df$Density[school_df$daycare.school == "no"])
+# nonparametric test 
+school_density_tt <- wilcox.test(school_df$Density ~ school_df$daycare.school)
+school_density_tt
+```
+
+### Correct for multiple t-tests
+
+```{r adjust multiple ttest}
+pvals_ttest <- c(school_size_tt$p.value, school_prophigh_tt$p.value, 
+                 school_kin_tt$p.value, school_adult_tt$p.value, school_raceentro_tt$p.value,
+                 school_raceei_tt$p.value, school_langentro_tt$p.value, school_langei_tt$p.value,
+                 school_cr_tt$p.value, school_density_tt$p.value)
+# adjust pvalues 
+pvals_ttest_adjust <- p.adjust(pvals_ttest, method = "fdr", n = length(pvals_ttest))
+
+# compare pvals 
+round(pvals_ttest, 3)
+round(pvals_ttest_adjust, 3)
+
+```
+
+***
+
+## Test for Age AND Daycare 
+
+### Network Size, Age, and Daycare 
+
+```{r age, size, daycare}
+# full model
+size_age_school <- lm(Network.Size_T ~ ageinmonths*daycare.school, 
+                      data = alldata)
+summary(size_age_school)
+# just test for school
+size_school <- lm(Network.Size_T ~ daycare.school, 
+                      data = alldata)
+summary(size_school)
+# main effect model 
+size_age_school.main <- lm(Network.Size_T ~ ageinmonths+daycare.school, 
+                      data = alldata)
+summary(size_age_school.main)
+# check tolerance 
+1/vif(size_age_school.main)
+
+# Plot 
+size_age_school_plot <- ggplot(school_df, aes(ageinyears, Network.Size)) +
+  geom_point(aes(colour = daycare.school)) + geom_jitter(aes(colour = daycare.school)) + 
+  xlab("Age (in years)") + 
+  ylab("Network Size") +
+  geom_smooth(method = "lm", colour = "black") + 
+  scale_colour_manual(values = c("purple", "mediumspringgreen")) + 
+  theme_minimal() +
+  theme(axis.line = element_line(colour = "black"),
+  text = element_text(size = 18, family = "Georgia")) 
+size_age_school_plot + labs(colour = "Daycare/School")
+
+## post-hoc correaltions by school or not 
+posthoc_school <- cor.test(alldata$Network.Size_T[alldata$daycare.school == "yes"],
+         alldata$ageinmonths[alldata$daycare.school == "yes"])
+posthoc_school 
+posthoc_noschool <- cor.test(alldata$Network.Size_T[alldata$daycare.school == "no"],
+         alldata$ageinmonths[alldata$daycare.school == "no"])
+posthoc_noschool
+
+# Bonferroni correction 
+pvals_posthoc <- c(posthoc_school$p.value, posthoc_noschool$p.value)
+round(pvals_posthoc, 8)
+round(p.adjust(pvals_posthoc, method = "bonferroni", n = length(pvals_posthoc)),8)
+```
+
+### PropHighIntense, Age, and Daycare 
+
+```{r prophighint, age, daycare}
+# full model
+highint_age_school <- lm(PropHighIntense ~ ageinmonths*daycare.school, 
+                      data = alldata)
+summary(highint_age_school)
+
+# just test for school
+highint_school <- lm(PropHighIntense ~ daycare.school, 
+                      data = alldata)
+summary(highint_school)
+# main effect model 
+highint_age_school.main <- lm(PropHighIntense ~ ageinmonths+daycare.school, 
+                      data = alldata)
+summary(highint_age_school.main)
+# check tolerance 
+1/vif(highint_age_school.main)
+
+
+# Plot 
+propint_age_school_plot <- ggplot(school_df, aes(ageinyears, PropHighIntense)) +
+  geom_point(aes(colour = daycare.school)) + geom_jitter(aes(colour = daycare.school)) + 
+  xlab("Age (in years)") + 
+  ylab("Proportion High Intense") +
+  scale_colour_manual(values = c("purple", "mediumspringgreen")) + 
+  theme_minimal() +
+  theme(axis.line = element_line(colour = "black"),
+  text = element_text(size = 18, family = "Georgia")) 
+propint_age_school_plot + labs(colour = "Daycare/School") + xlim(0,3.5)
+```
+
+### PropKin, Age, and Daycare 
+
+```{r propkin, age, daycare}
+# full model
+kin_age_school <- lm(PropKin_T ~ ageinmonths*daycare.school, 
+                      data = alldata)
+summary(kin_age_school)
+# just test for school
+kin_school <- lm(PropKin_T ~ daycare.school, 
+                      data = alldata)
+summary(kin_school)
+# main effect model 
+kin_age_school.main <- lm(PropKin_T ~ ageinmonths+daycare.school, 
+                      data = alldata)
+summary(kin_age_school.main)
+# check tolerance 
+1/vif(kin_age_school.main)
+
+# Plot 
+kin_age_school_plot <- ggplot(school_df, aes(ageinyears, PropKin, colour = daycare.school)) +
+  geom_point() + geom_jitter() + 
+  xlab("Age (in years)") + 
+  ylab("Proportion Kin") +
+  geom_smooth(method = "lm") + 
+  scale_colour_manual(values = c("purple", "mediumspringgreen")) + 
+  theme_minimal() +
+  theme(axis.line = element_line(colour = "black"),
+  text = element_text(size = 18, family = "Georgia"))
+kin_age_school_plot + labs(colour = "Daycare/School")
+```
+
+### PropAdult, Age, and Daycare 
+
+```{r propadult, age, daycare}
+# full model
+adult_age_school <- lm(PropAdult ~ ageinmonths*daycare.school, 
+                      data = alldata)
+summary(adult_age_school)
+# just test for school
+adult_school <- lm(PropAdult ~ daycare.school, 
+                      data = alldata)
+summary(adult_school)
+# main effect model 
+adult_age_school.main <- lm(PropAdult ~ ageinmonths+daycare.school, 
+                      data = alldata)
+summary(adult_age_school.main)
+# check tolerance 
+1/vif(adult_age_school.main)
+
+# Plot 
+adult_age_school_plot <- ggplot(school_df, aes(ageinyears, PropAdult, colour = daycare.school)) +
+  geom_point() + geom_jitter() + 
+  xlab("Age (in years)") + 
+  ylab("Proportion Adult") +
+  geom_smooth(method = "lm") + 
+  scale_colour_manual(values = c("purple", "mediumspringgreen")) + 
+  theme_minimal() +
+  theme(axis.line = element_line(colour = "black"),
+  text = element_text(size = 18, family = "Georgia"))
+adult_age_school_plot + labs(colour = "Daycare/School")
+```
+
+### Race Entropy, Age, and Daycare 
+
+```{r Race Entropy, age, daycare}
+# full model
+raceentro_age_school <- lm(NetworkRaceEntropy ~ ageinmonths*daycare.school, 
+                      data = alldata)
+summary(raceentro_age_school)
+# just test for school
+racentro_school <- lm(NetworkRaceEntropy ~ daycare.school, 
+                      data = alldata)
+summary(racentro_school)
+# main effect model 
+racentro_age_school.main <- lm(NetworkRaceEntropy ~ ageinmonths+daycare.school, 
+                      data = alldata)
+summary(racentro_age_school.main)
+# check tolerance 
+1/vif(racentro_age_school.main)
+
+# Plot 
+raceentro_age_school_plot <- ggplot(school_df, aes(ageinyears, NetworkRaceEntropy, colour = daycare.school)) +
+  geom_point() + geom_jitter() + 
+  xlab("Age (in years)") + 
+  ylab("Network Race Entropy") +
+  geom_smooth(method = "lm") + 
+  scale_colour_manual(values = c("purple", "mediumspringgreen")) + 
+  theme_minimal() +
+  theme(axis.line = element_line(colour = "black"),
+  text = element_text(size = 18, family = "Georgia")) +
+  theme(legend.position = "")
+raceentro_age_school_plot
+```
+
+### Race EI Index, Age, and Daycare 
+
+```{r Race EI, age, daycare}
+# full model
+raceei_age_school <- lm(RaceEIindex_detailedbiracial ~ ageinmonths*daycare.school, 
+                      data = alldata)
+summary(raceei_age_school)
+
+# just test for school
+raceei_school <- lm(RaceEIindex_detailedbiracial ~ daycare.school, 
+                      data = alldata)
+summary(raceei_school)
+# main effect model 
+raceei_age_school.main <- lm(RaceEIindex_detailedbiracial ~ ageinmonths+daycare.school, 
+                      data = alldata)
+summary(raceei_age_school.main)
+# check tolerance 
+1/vif(raceei_age_school.main)
+
+# Plot 
+raceei_age_school_plot <- ggplot(school_df, aes(ageinyears, RaceEIindex_detailedbiracial, colour = daycare.school)) +
+  geom_point() + geom_jitter() + 
+  xlab("Age (in years)") + 
+  ylab("Network Race EI Index") +
+  #geom_smooth(method = "lm") + 
+  scale_colour_manual(values = c("purple", "mediumspringgreen")) + 
+  theme_minimal() +
+  theme(axis.line = element_line(colour = "black"),
+  text = element_text(size = 18, family = "Georgia")) #+
+  #theme(legend.position = "bottom")
+raceei_age_school_plot <- raceei_age_school_plot + labs(colour = "Daycare/School")
+
+### Combine graphs
+grid.arrange(raceentro_age_school_plot, raceei_age_school_plot, ncol = 2)
+```
+
+### Language Entropy, Age, and Daycare 
+
+```{r language entroopy, age, daycare}
+# full model
+langentro_age_school <- lm(LangEntropy_perlang ~ ageinmonths*daycare.school, 
+                      data = alldata)
+summary(langentro_age_school)
+
+# just test for school
+langentro_school <- lm(LangEntropy_perlang ~ daycare.school, 
+                      data = alldata)
+summary(langentro_school)
+# main effect model 
+langentro_age_school.main <- lm(LangEntropy_perlang ~ ageinmonths+daycare.school, 
+                      data = alldata)
+summary(langentro_age_school.main)
+# check tolerance 
+1/vif(langentro_age_school.main)
+
+# Plot 
+langentro_age_school_plot <- ggplot(school_df, aes(ageinyears, LangEntropy_perlang, colour = daycare.school)) +
+  geom_point() + geom_jitter() + 
+  xlab("Age (in years)") + 
+  ylab("Network Language Entropy") +
+  #geom_smooth(method = "lm") + 
+  scale_colour_manual(values = c("purple", "mediumspringgreen")) + 
+  theme_minimal() +
+  theme(axis.line = element_line(colour = "black"),
+  text = element_text(size = 18, family = "Georgia")) +
+  theme(legend.position = "")
+langentro_age_school_plot <- langentro_age_school_plot + labs(colour = "School")
+```
+
+### Linguistic EI Index, Age, and Daycare 
+
+```{r language ei index, age, daycare}
+# full model
+langei_age_school <- lm(LangEIIndex ~ ageinmonths*daycare.school, 
+                      data = alldata)
+summary(langei_age_school)
+
+# just test for school
+langei_school <- lm(LangEIIndex ~ daycare.school, 
+                      data = alldata)
+summary(langei_school)
+# main effect model 
+langei_age_school.main <- lm(LangEIIndex ~ ageinmonths+daycare.school, 
+                      data = alldata)
+summary(langei_age_school.main)
+# check tolerance 
+1/vif(langei_age_school.main)
+
+# Plot 
+langei_age_school_plot <- ggplot(school_df, aes(ageinyears, LangEIIndex, colour = daycare.school)) +
+  geom_point() + geom_jitter() + 
+  xlab("Age (in years)") + 
+  ylab("Network Linguistic EI Index") +
+  #geom_smooth(method = "lm") + 
+  scale_colour_manual(values = c("purple", "mediumspringgreen")) + 
+  theme_minimal() +
+  theme(axis.line = element_line(colour = "black"),
+  text = element_text(size = 18, family = "Georgia")) +
+  theme(legend.position = "")
+langei_age_school_plot <- langei_age_school_plot + labs(colour = "School")
+
+### Combine graphs 
+grid.arrange(langentro_age_school_plot, langei_age_school_plot, ncol = 2)
+```
+
+### Number of Components, Age, and Daycare 
+
+```{r number components, age, daycare}
+# full model 
+components_age_school <- lm(NumContexts_T ~ ageinmonths*daycare.school, 
+                      data = alldata)
+summary(components_age_school)
+
+# just test for school
+components_school <- lm(NumContexts_T ~ daycare.school, 
+                      data = alldata)
+summary(components_school)
+# main effect model 
+components_age_school.main <- lm(NumContexts_T ~ ageinmonths+daycare.school, 
+                      data = alldata)
+summary(components_age_school.main)
+# check tolerance 
+1/vif(components_age_school.main)
+
+# Plot 
+components_age_school_plot <- ggplot(school_df, aes(ageinyears, NumContexts, colour = daycare.school)) +
+  geom_point() + geom_jitter() + 
+  xlab("Age (in years)") + 
+  ylab("Number of Components") +
+  geom_smooth(method = "lm") + 
+  scale_colour_manual(values = c("purple", "mediumspringgreen")) + 
+  theme_minimal() +
+  theme(axis.line = element_line(colour = "black"),
+  text = element_text(size = 18, family = "Georgia"))
+components_age_school_plot <- components_age_school_plot + labs(colour = "School")
+```
+
+### Component Ratio, Age, and Daycare 
+
+```{r component ratio, age, daycare}
+# full model
+cratio_age_school <- lm(componentratio ~ ageinmonths*daycare.school, 
+                      data = alldata)
+summary(cratio_age_school)
+
+# just test for school
+cratio_school <- lm(componentratio ~ daycare.school, 
+                      data = alldata)
+summary(cratio_school)
+# main effect model 
+cratio_age_school.main <- lm(componentratio ~ ageinmonths+daycare.school, 
+                      data = alldata)
+summary(cratio_age_school.main)
+# check tolerance 
+1/vif(cratio_age_school.main)
+
+# Plot 
+cratio_age_school_plot <- ggplot(school_df, aes(ageinyears, componentratio, colour = daycare.school)) +
+  geom_point() + geom_jitter() + 
+  xlab("Age (in years)") + 
+  ylab("Component Ratio (fragmentation)") +
+  geom_smooth(method = "lm") + 
+  scale_colour_manual(values = c("purple", "mediumspringgreen")) + 
+  theme_minimal() +
+  theme(axis.line = element_line(colour = "black"),
+  text = element_text(size = 18, family = "Georgia"))
+cratio_age_school_plot <- cratio_age_school_plot+ labs(colour = "Daycare/School")
+```
+
+### Density, Age, and Daycare 
+
+```{r density, age, daycare}
+# full model
+density_age_school <- lm(Density ~ ageinmonths*daycare.school, 
+                      data = alldata)
+summary(density_age_school)
+
+# just test for school
+density_school <- lm(Density ~ daycare.school, 
+                      data = alldata)
+summary(density_school)
+# main effect model 
+density_age_school.main <- lm(Density ~ ageinmonths+daycare.school, 
+                      data = alldata)
+summary(density_age_school.main)
+# check tolerance 
+1/vif(density_age_school.main)
+
+# Plot 
+density_age_school_plot <- ggplot(school_df, aes(ageinyears, Density, colour = daycare.school)) +
+  geom_point() + geom_jitter() + 
+  xlim(3,5) + 
+  xlab("Age (in years)") + 
+  ylab("Density") +
+  #geom_smooth(method = "lm") + 
+  scale_colour_manual(values = c("purple", "mediumspringgreen")) + 
+  theme_minimal() +
+  theme(axis.line = element_line(colour = "black"),
+  text = element_text(size = 18, family = "Georgia"))
+density_age_school_plot <- density_age_school_plot + labs(colour = "Daycare/School")
+```
+
+***
+
+## Correction of Multiple Comparisons
+
+### CORRELATIONS
+
+22 tests
+
+Size and Age, Prop High and Age, Prop Low and Age, PropKin and Age, PropAdult and Age, RaceEntro and Age, RaceEI and Age, LangEntro and Age, LangEI and Age, Density and Age, Number of Components and Age, Component Ratio and Age, RaceEntro and RaceEI, LangEntro and LangEI, Size and Age - School, Size and Age - No School, NetworkRD and NeighborhoodRD - total/urban/suburb, NetworkLD and Neighborhood LD - total/urban/suburb
+
+```{r correlations correction}
+pvals <- c(size_age_cor$p.value, prophigint_age_cor$p.value, proplowint_age_cor$p.value,
+           propkin_age_cor$p.value, propadult_age_cor$p.value, raceentropy_age_cor$p.value,
+           raceei_age_cor$p.value, langentropy_age_cor$p.value, langei_age_cor$p.value,
+           density_age_cor$p.value, components_age_cor$p.value, cr_age_cor$p.value,
+           raceentro_raceei_cor$p.value, langentro_langei_cor$p.value, posthoc_school$p.value,
+           posthoc_noschool$p.value, neighborhood_rd$p.value, neighborhood_rd_urban$p.value,
+           neighborhood_rd_suburb$p.value, neighborhood_ld$p.value, neighborhood_ld_urban$p.value,
+           neighborhood_ld_suburb$p.value)
+fdr <- p.adjust(pvals, method = "fdr", n = length(pvals))
+bonferroni <- p.adjust(pvals, method = "bonferroni", n = length(pvals))
+
+# make dataframe to easily compare 
+# dataframe 
+correlation_corrections <- data.frame(round(pvals, 3))
+colnames(correlation_corrections) <- c("pvals before")
+# fdr dataframe
+fdr_df <- data.frame(round(fdr, 3))
+correlation_corrections$fdr <- fdr_df$round.fdr..3.
+# bonferroni 
+bonferroni_df <- data.frame(round(bonferroni, 3))
+correlation_corrections$bonferroni <- bonferroni_df$round.bonferroni..3.
+
+correlation_corrections
+```
+
+### T-TEST
+
+18 tests 
+
+RACE MAJORITY VS. MINORITY: 
+network size, proportion high intense, proportion kin, proportion adult, number of components, component ratio, density, racial entropy, racial ei index
+
+MONO VS MULTILINUGUAL 
+network size, proportion high intense, proportion kin, proportion adult, number of components, component ratio, density, language entropy, linguistic ei index
+
+age_race_ttest
+age_lang-ttest
+size_race_ttest
+size_lang_ttest
+prophigh_race_ttest
+prophigh_lang_ttest
+propkin_race_ttest
+propkin_lang_ttest
+propadult_race_ttest
+propadult_lang_ttest
+numcomp_race_ttest
+numcomp_lang_ttest
+cr_race_ttest
+cr_lang_ttest
+density_race_ttest
+density_lang_ttest
+raceentro_ttest
+raceei_ttest
+langentro_ttest
+langei_ttest
+
+```{r ttest corrections}
+# get pvalues of the t-tests 
+pvals_ttest <- c(age_race_ttest$p.value, age_lang_ttest$p.value,
+                 size_race_ttest$p.value, size_lang_ttest$p.value,
+                 prophigh_race_ttest$p.value, prophigh_lang_ttest$p.value,
+                 propkin_race_ttest$p.value, propkin_lang_ttest$p.value,
+                 propadult_race_ttest$p.value, propadult_lang_ttest$p.value,
+                 numcomp_race_ttest$p.value, numcomp_lang_ttest$p.value,
+                 cr_race_ttest$p.value, cr_lang_ttest$p.value, 
+                 density_race_ttest$p.value, density_lang_ttest$p.value,
+                 raceentro_ttest$p.value, raceei_ttest$p.value, 
+                 langentro_ttest$p.value, langei_ttest$p.value)
+# get fdr corrected pvalues 
+fdr_ttest <- p.adjust(pvals_ttest, method = "fdr", n = length(pvals_ttest))
+
+# make dataframe of og pvals 
+ttest_corrections <- data.frame(round(pvals_ttest, 3))
+# make a dataframe of the fdr corrected pvals 
+fdr_ttest_df <- data.frame(round(fdr_ttest, 3))
+# add the column to the ttest dataframe 
+ttest_corrections$fdrpvals <- fdr_ttest_df$round.fdr_ttest..3.
+# change the columnnames
+colnames(ttest_corrections) <- c("pvalsbefore", "fdrcorrected")
+
+```
+
+***
+
+## How Network Variables relate to each other 
+
+```{r network correlations}
+plot_scatter(alldata$Density, alldata$Network.Size, 
+             "Density", "Network Size")
+cor.test(alldata$Density, alldata$Network.Size_T)
+
+plot_scatter(alldata$NumContexts, alldata$Network.Size, 
+             "Number of Components", "Network Size")
+cor.test(alldata$NumContexts, alldata$Network.Size_T)
+
+```
+
+***
+## COMPLEXITY ANALYSIS 
+
+```{r complexity analysis}
+### Subset Data for complexity analysis 
+racepref <- subset(alldata, study == "RacePref")
+# add column to get Proportion of Zero Entropy Compoments 
+racepref$PropZeroComp <- NA
+
+### Function to count the componets that have zero racial entropy
+for (i in 1:nrow(racepref)) {
+  countzero <- 0
+  # if comp is 0 and not empty 
+  if (racepref$familycomp_raceentro[i] == 0 && (is.na(racepref$familycomp_raceentro[i]) == FALSE)) {
+    countzero <- countzero + 1
+  }
+  if (racepref$schoolcomp_raceentro[i] == 0 && (is.na(racepref$schoolcomp_raceentro[i]) == FALSE)) {
+    countzero <- countzero + 1
+  }
+  if (racepref$extra1comp_raceentro[i] == 0 && (is.na(racepref$extra1comp_raceentro[i]) == FALSE)) {
+    countzero <- countzero + 1
+  }
+  if (racepref$extra2comp_raceentro[i] == 0 && (is.na(racepref$extra2comp_raceentro[i]) == FALSE)) {
+    countzero <- countzero + 1
+  }
+  if (racepref$extra3comp_raceentro[i] == 0 && (is.na(racepref$extra3comp_raceentro[i]) == FALSE)) {
+    countzero <- countzero + 1
+  }
+  if (racepref$extra4comp_raceentro[i] == 0 && (is.na(racepref$extra4comp_raceentro[i]) == FALSE)) {
+    countzero <- countzero + 1
+  }
+  if (racepref$extra5comp_raceentro[i] == 0 && (is.na(racepref$extra5comp_raceentro[i]) == FALSE)) {
+    countzero <- countzero + 1
+  }
+  racepref$PropZeroComp[i] <- countzero/racepref$NumContexts[i]
+}
+
+### Add a column to say if it is "segragated" or "integrated" - using just 1 component with 0 entropy
+racepref$complexity <- NA
+# function to detrimine if network is segragated or integrated
+for (i in 1:nrow(racepref)) {
+  if (racepref$PropZeroComp[i] == 0 && (is.na(racepref$PropZeroComp[i]) == FALSE)) {
+    racepref$complexity[i] <- "integrated"
+  }
+  if (racepref$PropZeroComp[i] > 0 && racepref$PropZeroComp[i] < 1 &&
+      (is.na(racepref$PropZeroComp[i]) == FALSE)) {
+    racepref$complexity[i] <- "segragated"
+  }
+  if (racepref$PropZeroComp[i] == 1 && (is.na(racepref$PropZeroComp[i]) == FALSE)) {
+    racepref$complexity[i] <- "no diversity"
+  }
+}
+
+### Add a column to say if it is "segragated" or "integrated" - using PROP0ENTROPY
+# first, look at prop 0 entropy
+ggplot(racepref, aes(PropZeroComp)) +
+  geom_histogram() +
+  xlab("Proportion of Zero Entropy Components") + 
+  theme_minimal() +
+  theme(axis.line = element_line(colour = "black"),
+        text = element_text(size = 18, family = "Georgia"))
+
+# make new column
+racepref$complexity2 <- NA
+# function to detrimine if network is segragated or integrated
+for (i in 1:nrow(racepref)) {
+  if (racepref$PropZeroComp[i] < .5 && (is.na(racepref$PropZeroComp[i]) == FALSE)) {
+    racepref$complexity2[i] <- "integrated"
+  }
+  if (racepref$PropZeroComp[i] >= .5 && racepref$PropZeroComp[i] < 1 &&
+      (is.na(racepref$PropZeroComp[i]) == FALSE)) {
+    racepref$complexity2[i] <- "segragated"
+  }
+  if (racepref$PropZeroComp[i] == 1 && (is.na(racepref$PropZeroComp[i]) == FALSE)) {
+    racepref$complexity2[i] <- "no diversity"
+  }
+}
+
+# check to make sure the complexity column and PropZero are correct
+max(racepref$PropZeroComp, na.rm = TRUE)
+columnnames <- c("SubjectID", "NumContexts", "PropZeroComp", "complexity")
+checking <- racepref[columnnames]
+
+### get information about the complexity by child race 
+# segragate, integrated, no diversity 
+complexity_df <- racepref %>%
+  group_by(ChildRace) %>%
+  count(complexity)
+complexity_df_sample <- racepref %>%
+  count(complexity)
+# average proportion zero 
+propzero_df <- racepref %>%
+  group_by(ChildRace) %>%
+  summarize(MinPropZero = min(PropZeroComp, na.rm = TRUE),
+            MaxPropZero = max(PropZeroComp, na.rm = TRUE),
+            AvgPropZero = mean(PropZeroComp, na.rm = TRUE),
+            sdPropZero = sd(PropZeroComp, na.rm = TRUE))
+
+### Make these dataframes by racial majority vs. racial minority 
+# make a column that is racial majority vs. racial minority 
+racepref$ChildRace_2cat <- NA
+# function to relabel the childrace column 
+for (i in 1:nrow(racepref)) {
+  if (racepref$ChildRace[i] == "European or White-American") {
+    racepref$ChildRace_2cat[i] <- "majority-White"
+  }
+  else {
+    racepref$ChildRace_2cat[i] <- "racial minority"
+  }
+}
+## check the ChildRace_2cat
+columnnames2 <- c("SubjectID", "ChildRace", "ChildRace_2cat")
+checking2 <- racepref[columnnames2]
+
+### rerun the same dataframe as above 
+# segragate, integrated, no diversity - by first classification 
+complexity_df <- racepref %>%
+  group_by(ChildRace_2cat) %>%
+  count(complexity)
+# segragate, integrated, no diversity - by using the proportion zero entropy 
+complexity_df2 <- racepref %>%
+  group_by(ChildRace_2cat) %>%
+  count(complexity2)
+# average proportion zero 
+propzero_df <- racepref %>%
+  group_by(ChildRace_2cat) %>%
+  summarize(MinPropZero = min(PropZeroComp, na.rm = TRUE),
+            MaxPropZero = max(PropZeroComp, na.rm = TRUE),
+            AvgPropZero = mean(PropZeroComp, na.rm = TRUE),
+            sdPropZero = sd(PropZeroComp, na.rm = TRUE))
+# test difference 
+t.test(racepref$PropZeroComp[racepref$ChildRace_2cat == "majority-White"],
+       racepref$PropZeroComp[racepref$ChildRace_2cat == "racial minority"])
+propzero_ttest <- wilcox.test(racepref$PropZeroComp[racepref$ChildRace_2cat == "majority-White"],
+       racepref$PropZeroComp[racepref$ChildRace_2cat == "racial minority"])
+propzero_ttest
+
+
+##### run chisquare test #####
+# make new dataframe so "NA" is not a category 
+cols_chisq <- c("SubjectID", "ChildRace_2cat", "complexity2")
+chisq_df <- racepref[cols_chisq]
+chisq_df <- na.omit(chisq_df)
+table(chisq_df$ChildRace_2cat, chisq_df$complexity2)
+# plot 
+ggplot(chisq_df) +
+  aes(x = ChildRace_2cat, fill = complexity2) +
+  geom_bar() +
+  scale_fill_hue() +
+  theme_minimal()
+# chisquare 
+chisq.test(table(chisq_df$ChildRace_2cat, chisq_df$complexity2))
+
+
+#### EXPORT FOR TO ADD TO RACIAL PREFERENCE STUDY!!!! #######
+# get desired columns
+cols <- c("SubjectID", "PropZeroComp", "complexity2")
+toexport <- racepref[cols]
+# export file 
+#write.csv(toexport, file = "~/Box/COVID19 Backups/RacePref/3.18.20/complexityanalysis.csv")
+
+
+
+
+```
+
+
+
+
+
+
+
